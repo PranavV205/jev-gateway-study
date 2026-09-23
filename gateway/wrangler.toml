@@ -11,3 +11,6 @@ migrations_dir = "migrations"
 
 [observability]
 enabled = true
+
+[dev]
+port = 8000

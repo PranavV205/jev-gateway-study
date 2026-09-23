@@ -8,6 +8,7 @@
       "!corpus",
       "!docs",
       "!**/results",
+      "!**/dist",
       "!**/.wrangler",
       "!**/migrations",
       "!**/worker-configuration.d.ts"
