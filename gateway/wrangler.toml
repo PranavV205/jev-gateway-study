@@ -1,0 +1,13 @@
+name = "jev-gateway-study"
+main = "src/index.ts"
+compatibility_date = "2026-08-15"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "jev-gateway-study"
+database_id = "local-only"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true

@@ -1,0 +1,25 @@
+{
+  "name": "gateway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler d1 migrations apply DB --local && wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "0.6.0",
+    "drizzle-orm": "0.45.3",
+    "hono": "4.13.8",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "drizzle-kit": "0.31.11",
+    "vitest": "4.1.11",
+    "wrangler": "4.137.0"
+  }
+}

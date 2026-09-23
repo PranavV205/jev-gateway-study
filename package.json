@@ -1,0 +1,22 @@
+{
+  "name": "jev-gateway-study",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "gateway"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run dev -w gateway",
+    "test": "npm test -w gateway",
+    "typecheck": "npm run typecheck -w gateway",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "typescript": "^5.9.3"
+  }
+}
