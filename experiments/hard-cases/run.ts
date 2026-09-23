@@ -1,6 +1,6 @@
 // Runs every case in cases.json through Jev and Prompt Guard 2, saves raw
 // responses, and prints results per group plus every wrong call.
-// Run with: npm run cases (reads keys from ../.env)
+// Run with: npm run cases (reads keys from the .env at the repo root)
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { noul, TypeSafeClient } from "@typesafe-ai/sdk";

@@ -1,9 +1,9 @@
 {
-  "name": "smoke",
+  "name": "question-wording",
   "private": true,
   "type": "module",
   "scripts": {
-    "smoke": "tsx --env-file=../.env run.ts"
+    "wording": "tsx --env-file=../../.env run.ts"
   },
   "dependencies": {
     "@typesafe-ai/sdk": "^0.6.0"

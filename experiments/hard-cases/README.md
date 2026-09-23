@@ -16,7 +16,7 @@ A harder test of Jev as a prompt-injection screen, built to find where it breaks
 
 ## Run it
 
-Needs Node 20+ and a `.env` file one level up with `TYPESAFE_API_KEY` and `GROQ_API_KEY`.
+Needs Node 20+ and a `.env` file at the repo root with `TYPESAFE_API_KEY` and `GROQ_API_KEY`.
 
 ```sh
 npm install

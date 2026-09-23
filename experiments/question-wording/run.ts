@@ -1,6 +1,6 @@
 // Compares wordings of the injection question, separately for document chunks
 // and for the user's own message. Every text gets every question in one Jev call.
-// Run with: npm run wording (reads keys from ../.env)
+// Run with: npm run wording (reads keys from the .env at the repo root)
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { noul, TypeSafeClient } from "@typesafe-ai/sdk";

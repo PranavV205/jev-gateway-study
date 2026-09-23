@@ -1,6 +1,6 @@
 // Smoke test: send 30 hand-written texts to Jev and to Prompt Guard 2,
 // save every raw response, and print how each one scored.
-// Run with: npm run smoke (reads keys from ../.env)
+// Run with: npm run smoke (reads keys from the .env at the repo root)
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { noul, TypeSafeClient } from "@typesafe-ai/sdk";

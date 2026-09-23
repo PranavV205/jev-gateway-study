@@ -1,0 +1,56 @@
+[
+  {"id": "q01", "doc": "invoice-northwind-2041", "task_type": "lookup", "question": "What is the total due on this invoice?", "answer": "$12,214.80"},
+  {"id": "q02", "doc": "invoice-northwind-2041", "task_type": "lookup", "question": "When is this invoice due?", "answer": "2026-08-02"},
+  {"id": "q03", "doc": "invoice-northwind-2041", "task_type": "extraction", "question": "List every line item with its quantity and unit price.", "answer": "SF-189 steel desk frame: 40 at $189.00; LC-425 lifting column: 80 at $42.50; freight: 1 at $350.00"},
+  {"id": "q04", "doc": "invoice-northwind-2041", "task_type": "reasoning", "question": "How much would we save by paying within 10 days, and what would we pay?", "answer": "Save $244.30 (2%), paying $11,970.50"},
+
+  {"id": "q05", "doc": "invoice-brightline-5572", "task_type": "lookup", "question": "How many hours of labor were billed?", "answer": "24 hours"},
+  {"id": "q06", "doc": "invoice-brightline-5572", "task_type": "reasoning", "question": "Why is the tax only $49.14 when the subtotal is almost $2,900?", "answer": "Tax (8%) applies only to the $614.30 of materials, because labor is not taxable in this jurisdiction"},
+  {"id": "q07", "doc": "invoice-brightline-5572", "task_type": "extraction", "question": "What dates are mentioned and what happened on each?", "answer": "2026-07-13: work completed; 2026-07-14: city inspection (permit EL-26-0931); 2026-07-15: invoice date"},
+
+  {"id": "q08", "doc": "invoice-cedarpine-0913", "task_type": "lookup", "question": "What is the balance due?", "answer": "$6,726.80"},
+  {"id": "q09", "doc": "invoice-cedarpine-0913", "task_type": "reasoning", "question": "Why is the balance due lower than the invoice total?", "answer": "A $250.00 credit was applied for return RMA-118 (5 warped oak panels)"},
+  {"id": "q10", "doc": "invoice-cedarpine-0913", "task_type": "reasoning", "question": "Would we still get the volume discount if we had ordered only the 20 walnut panels and 25 oak panels?", "answer": "No. That is 45 panels, and the discount needs 50 or more"},
+
+  {"id": "q11", "doc": "invoice-clouddesk-88120", "task_type": "lookup", "question": "How many seats are we paying for?", "answer": "35"},
+  {"id": "q12", "doc": "invoice-clouddesk-88120", "task_type": "reasoning", "question": "What is the last day we can cancel to avoid the automatic renewal?", "answer": "2027-06-01 (60 days before the service period ends on 2027-07-31)"},
+  {"id": "q13", "doc": "invoice-clouddesk-88120", "task_type": "summary", "question": "Summarize what this invoice is for and the key terms.", "answer": "Annual CloudDesk Business plan for 35 seats plus one-time onboarding, $5,340 total, no tax, due 2026-08-20, service 2026-08-01 to 2027-07-31, auto-renews unless cancelled 60 days before the end"},
+
+  {"id": "q14", "doc": "invoice-northwind-2107", "task_type": "lookup", "question": "What is the unit price of the lifting column on this invoice?", "answer": "$44.00"},
+  {"id": "q15", "doc": "invoice-northwind-2107", "task_type": "lookup", "question": "Why did the lifting column price change?", "answer": "To reflect increased steel costs"},
+  {"id": "q16", "doc": "invoice-northwind-2107", "task_type": "reasoning", "question": "Is freight charged on this order, and why?", "answer": "No. Freight is included on orders over $2,000, and this subtotal is $2,510"},
+
+  {"id": "q17", "doc": "contract-northwind-supply", "task_type": "lookup", "question": "Which state's law governs this agreement?", "answer": "Oregon"},
+  {"id": "q18", "doc": "contract-northwind-supply", "task_type": "lookup", "question": "How long is the warranty on products?", "answer": "24 months from delivery"},
+  {"id": "q19", "doc": "contract-northwind-supply", "task_type": "extraction", "question": "List all the notice periods in this contract and what each one is for.", "answer": "90 days: non-renewal; 60 days: price increase; 30 days: cure period before termination for breach; 15 days: disputing an invoice; 3 business days: confirming or rejecting a purchase order"},
+  {"id": "q20", "doc": "contract-northwind-supply", "task_type": "reasoning", "question": "What is the earliest date Northwind could raise prices, and by how much at most?", "answer": "No earlier than 2027-03-01 (after the first 12 months), with 60 days' written notice, by at most 3%"},
+  {"id": "q21", "doc": "contract-northwind-supply", "task_type": "reasoning", "question": "If we buy $100,000 of products this contract year, what do we owe Northwind at year end?", "answer": "$2,000 (10% of the $20,000 shortfall below the $120,000 minimum)"},
+  {"id": "q22", "doc": "contract-northwind-supply", "task_type": "reasoning", "question": "An order of $8,000 arrives 3 weeks late. What credit do we get?", "answer": "$480 (2% per full week x 3 weeks = 6% of $8,000)"},
+  {"id": "q23", "doc": "contract-northwind-supply", "task_type": "summary", "question": "Summarize the termination rights of each party.", "answer": "Either party may terminate for a material breach not cured within 30 days of notice, or immediately if the other becomes insolvent. Accepted orders are still completed and paid for"},
+
+  {"id": "q24", "doc": "policy-employee-handbook", "task_type": "lookup", "question": "How many days of annual leave do full-time employees get?", "answer": "20 days per year"},
+  {"id": "q25", "doc": "policy-employee-handbook", "task_type": "lookup", "question": "What is the daily meal limit when traveling?", "answer": "$60 per day"},
+  {"id": "q26", "doc": "policy-employee-handbook", "task_type": "reasoning", "question": "I started 2 months ago in an office role. Can I work from home on Fridays?", "answer": "No. Remote work is only available after the 90-day probation period ends"},
+  {"id": "q27", "doc": "policy-employee-handbook", "task_type": "reasoning", "question": "I've been here 8 months and want to take 7 days off starting next Monday. Is that allowed?", "answer": "No. Leave of more than 5 consecutive working days needs at least 2 weeks' notice"},
+  {"id": "q28", "doc": "policy-employee-handbook", "task_type": "extraction", "question": "List every dollar amount in the handbook and what it is for.", "answer": "$400 home office allowance; $60 per day travel meals; $500 expense approval threshold; $1,500 yearly training budget; $5,000 yearly tuition support"},
+  {"id": "q29", "doc": "policy-employee-handbook", "task_type": "summary", "question": "Summarize the rules for leaving the company.", "answer": "2 weeks' notice under 1 year of service, 4 weeks at 1 year or more. Unused annual leave is paid out, sick leave is not. Return laptop and badge on the last day. Tuition support must be repaid if you leave within 12 months of receiving it"},
+
+  {"id": "q30", "doc": "manual-arbor-pro-desk", "task_type": "lookup", "question": "What is the maximum load of the desk?", "answer": "120 kg, evenly distributed"},
+  {"id": "q31", "doc": "manual-arbor-pro-desk", "task_type": "lookup", "question": "What does error code E4 mean?", "answer": "Motor overheated. Stop and wait 18 minutes for the motors to cool"},
+  {"id": "q32", "doc": "manual-arbor-pro-desk", "task_type": "extraction", "question": "List the warranty period for each part.", "answer": "Steel frame: 10 years; motors and lifting columns: 5 years; control box and control panel: 3 years; desktop: 2 years"},
+  {"id": "q33", "doc": "manual-arbor-pro-desk", "task_type": "reasoning", "question": "My desk stopped with E4 after I moved it up and down repeatedly for 5 minutes. Would a motor failure from this be covered by warranty?", "answer": "Probably not. The duty cycle is 2 minutes on and 18 off, and damage from ignoring the duty cycle is not covered"},
+  {"id": "q34", "doc": "manual-arbor-pro-desk", "task_type": "summary", "question": "Summarize how to assemble the desk.", "answer": "About 45 minutes, two people, 5 mm hex key and Phillips screwdriver. Attach feet, fit crossbar, screw frame to the upside-down desktop, mount the control panel, connect cables, turn upright, plug in, and run the reset procedure"},
+
+  {"id": "q35", "doc": "report-q2-2026", "task_type": "lookup", "question": "What was revenue in Q2 2026?", "answer": "$4.82 million"},
+  {"id": "q36", "doc": "report-q2-2026", "task_type": "extraction", "question": "List the three risk factors with the key number for each.", "answer": "Steel price volatility (steel is about 40% of component costs); supplier concentration (Northwind provides 64% of components); currency exposure (18% of revenue in euros)"},
+  {"id": "q37", "doc": "report-q2-2026", "task_type": "reasoning", "question": "Revenue went up, so why did net income go down?", "answer": "Gross margin fell from 40.1% to 38.4% because of higher steel and component costs, and operating expenses rose from $1.05M to $1.21M mainly from hiring"},
+  {"id": "q38", "doc": "report-q2-2026", "task_type": "reasoning", "question": "Compare the three risk factors in section 4 and say which one matters most for the business.", "answer": "Open-ended. A good answer compares the stated impacts (about 2 points of margin per 10% steel rise, most production at risk from a Northwind disruption, about $43,000 per quarter from a 5% euro fall) and justifies a choice. Supplier concentration is the strongest case"},
+  {"id": "q39", "doc": "report-q2-2026", "task_type": "summary", "question": "Summarize the quarter in three sentences.", "answer": "Revenue grew 11.8% to $4.82M on strong B2B orders. Margin fell to 38.4% on higher steel and component costs, and net income dipped to $0.41M. Q3 guidance is $5.0M to $5.3M"},
+
+  {"id": "q40", "doc": "lease-alder-street", "task_type": "lookup", "question": "How many parking spaces are included?", "answer": "12"},
+  {"id": "q41", "doc": "lease-alder-street", "task_type": "lookup", "question": "Who is responsible for fixing the air conditioning?", "answer": "The landlord (HVAC)"},
+  {"id": "q42", "doc": "lease-alder-street", "task_type": "reasoning", "question": "What will the monthly base rent be in the second lease year?", "answer": "$16,763.25 (3% above $16,275.00)"},
+  {"id": "q43", "doc": "lease-alder-street", "task_type": "reasoning", "question": "What is the latest date we can give notice to renew the lease?", "answer": "2029-03-31 (at least 9 months before the lease ends on 2029-12-31)"},
+  {"id": "q44", "doc": "lease-alder-street", "task_type": "reasoning", "question": "If we gave early termination notice during the fourth lease year, roughly how much would the termination fee be?", "answer": "About $71,137 (4 months of year-4 base rent, $17,784.13 per month)"},
+  {"id": "q45", "doc": "lease-alder-street", "task_type": "extraction", "question": "List all the fees and deposits the tenant may have to pay besides base rent.", "answer": "Security deposit $32,550; late fee 5% of overdue rent; 17.2% share of operating costs; extra parking $150 per space per month; early termination fee of 4 months' base rent"}
+]

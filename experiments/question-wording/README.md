@@ -12,7 +12,7 @@ This compares four wordings for each context, all asked in one Jev call per text
 
 ## Run it
 
-Needs Node 20+, a `.env` one level up with `TYPESAFE_API_KEY`, and `../hard-cases/cases.json`.
+Needs Node 20+, a `.env` at the repo root with `TYPESAFE_API_KEY`, and `../hard-cases/cases.json`.
 
 ```sh
 npm install

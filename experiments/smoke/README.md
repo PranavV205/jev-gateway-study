@@ -11,7 +11,7 @@ A text counts as flagged at a score of 0.5 or higher.
 
 ## Run it
 
-Needs Node 20+ and a `.env` file one level up with `TYPESAFE_API_KEY` and `GROQ_API_KEY`.
+Needs Node 20+ and a `.env` file at the repo root with `TYPESAFE_API_KEY` and `GROQ_API_KEY`.
 
 ```sh
 npm install
