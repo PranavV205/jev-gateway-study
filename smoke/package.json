@@ -1,0 +1,16 @@
+{
+  "name": "smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "tsx --env-file=../.env run.ts"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
