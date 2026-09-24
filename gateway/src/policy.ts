@@ -64,3 +64,35 @@ export function decideScreen(user: UserInput, chunks: ChunkInput[], t: Threshold
     chunks: chunkDecisions,
   };
 }
+
+// Routing decisions.
+
+export interface RouteRules {
+  cheapTasks: string[];
+  minCheapProbability: number;
+  maxNeedsStrong: number;
+}
+
+export interface RouteInput {
+  taskProbs: Record<string, number>;
+  pNeedsStrong: number;
+}
+
+export type RouteReason = "forced" | "no_router" | "route_failed" | "cheap_task" | "strong_task" | "needs_strong";
+
+// Strong is the default; cheap has to be earned. The cheap task types all go to the same
+// tier, so their probabilities are added up: a question split between "lookup" and
+// "extraction" is still clearly a cheap task. `route` is null when routing was skipped
+// or failed, and `failed` says which.
+export function decideRoute(
+  route: RouteInput | null,
+  rules: RouteRules,
+  opts: { forced: "cheap" | "strong" | null; failed: boolean },
+): { tier: "cheap" | "strong"; reason: RouteReason } {
+  if (opts.forced) return { tier: opts.forced, reason: "forced" };
+  if (!route) return { tier: "strong", reason: opts.failed ? "route_failed" : "no_router" };
+  const pCheap = rules.cheapTasks.reduce((sum, t) => sum + (route.taskProbs[t] ?? 0), 0);
+  if (pCheap < rules.minCheapProbability) return { tier: "strong", reason: "strong_task" };
+  if (route.pNeedsStrong >= rules.maxNeedsStrong) return { tier: "strong", reason: "needs_strong" };
+  return { tier: "cheap", reason: "cheap_task" };
+}

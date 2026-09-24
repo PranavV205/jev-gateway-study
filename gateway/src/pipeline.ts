@@ -1,10 +1,11 @@
 import { drizzle } from "drizzle-orm/d1";
-import type { Classifier } from "./classifiers/base";
+import type { Classifier, Router } from "./classifiers/base";
 import { JevClassifier } from "./classifiers/jev";
 import { config, costUsd, type Tier, tierModel } from "./config";
-import { llmCalls, requests, screenResults } from "./db/schema";
+import { llmCalls, requests, routeDecisions, screenResults } from "./db/schema";
 import { buildMessages } from "./prompt";
 import { type ChatResult, chat, ProviderError } from "./providers/chat";
+import { type RouteRun, route, routeReport } from "./route";
 import type { ChatRequest } from "./schemas";
 import { type ScreenRun, screen, screenReport } from "./screen";
 
@@ -15,11 +16,11 @@ export interface GatewayReport {
   tier: Tier | null;
   provider: string | null;
   model: string | null;
-  route: null;
+  route: ReturnType<typeof routeReport>;
   screen: ReturnType<typeof screenReport>;
   cost_usd: number;
   baseline_cost_usd: number;
-  latency_ms: { screen: number; model: number; total: number };
+  latency_ms: { screen: number; route: number; model: number; total: number };
   error?: string;
 }
 
@@ -43,21 +44,29 @@ export function makeClassifier(env: Env, name: ChatRequest["options"]["classifie
   return name === "jev" ? new JevClassifier(env.TYPESAFE_API_KEY) : null;
 }
 
-// Routing is not wired in yet: allowed requests go to the strong tier unless the caller forces one.
+export function makeRouter(env: Env, name: ChatRequest["options"]["router"]): Router | null {
+  return name === "jev" ? new JevClassifier(env.TYPESAFE_API_KEY) : null;
+}
+
 export async function handleChat(
   env: Env,
   req: ChatRequest,
   classifier: Classifier | null = makeClassifier(env, req.options.classifier),
+  router: Router | null = makeRouter(env, req.options.router),
 ): Promise<ChatResponse> {
   const start = Date.now();
   const requestId = crypto.randomUUID();
 
-  const run = await screen(classifier, req.user_message, req.context_chunks);
+  // Screening and routing both only need the request, so they run at the same time.
+  const [run, routed] = await Promise.all([
+    screen(classifier, req.user_message, req.context_chunks),
+    route(router, req.user_message, req.options.force_tier),
+  ]);
   const refused = run.decision.action === "refused";
   const dropped = new Set(run.decision.chunks.filter((c) => c.action === "dropped").map((c) => c.id));
   const keptChunks = req.context_chunks.filter((c) => !dropped.has(c.id));
 
-  const tier: Tier = req.options.force_tier ?? "strong";
+  const tier: Tier = routed.tier;
   const { provider, model } = tierModel(tier);
   const strong = tierModel("strong");
 
@@ -89,6 +98,7 @@ export async function handleChat(
     requestId,
     req,
     run,
+    routed,
     action,
     tier: calledModel ? tier : null,
     provider: calledModel ? provider : null,
@@ -109,11 +119,16 @@ export async function handleChat(
       tier: calledModel ? tier : null,
       provider: calledModel ? provider : null,
       model: calledModel ? model : null,
-      route: null,
+      route: routeReport(routed),
       screen: screenReport(run),
-      cost_usd: llmCost + run.costUsd,
+      cost_usd: llmCost + run.costUsd + routed.costUsd,
       baseline_cost_usd: baselineCost,
-      latency_ms: { screen: run.latencyMs, model: result?.latencyMs ?? 0, total: totalMs },
+      latency_ms: {
+        screen: run.latencyMs,
+        route: routed.latencyMs,
+        model: result?.latencyMs ?? 0,
+        total: totalMs,
+      },
       ...(error ? { error: error.message } : {}),
     },
   };
@@ -123,6 +138,7 @@ interface LogInput {
   requestId: string;
   req: ChatRequest;
   run: ScreenRun;
+  routed: RouteRun;
   action: GatewayReport["action"];
   tier: Tier | null;
   provider: string | null;
@@ -147,11 +163,14 @@ async function log(env: Env, x: LogInput) {
     action: x.action,
     flagged: x.run.decision.flagged,
     classifier: x.run.classifier,
+    router: x.routed.router,
+    routeReason: x.routed.reason,
     tier: x.tier,
     provider: x.provider,
     model: x.model,
-    costUsd: x.llmCost + x.run.costUsd,
+    costUsd: x.llmCost + x.run.costUsd + x.routed.costUsd,
     screenCostUsd: x.run.costUsd,
+    routeCostUsd: x.routed.costUsd,
     baselineCostUsd: x.baselineCost,
     latencyMs: x.totalMs,
     screenLatencyMs: x.run.latencyMs,
@@ -198,6 +217,27 @@ async function log(env: Env, x: LogInput) {
       }),
     );
     if (first) await db.batch([first, ...rest]);
+  }
+
+  const r = x.routed.outcome;
+  if (r) {
+    await db.insert(routeDecisions).values({
+      id: crypto.randomUUID(),
+      requestId: x.requestId,
+      router: x.routed.router,
+      model: r.ok ? r.score.model : null,
+      taskType: r.ok ? r.score.taskType : null,
+      taskProbsJson: r.ok ? JSON.stringify(r.score.taskProbs) : null,
+      confidence: r.ok ? r.score.confidence : null,
+      pNeedsStrong: r.ok ? r.score.pNeedsStrong : null,
+      tier: x.routed.tier,
+      reason: x.routed.reason,
+      inputTokens: r.ok ? r.score.inputTokens : 0,
+      costUsd: x.routed.costUsd,
+      latencyMs: x.routed.latencyMs,
+      status: r.ok ? "ok" : "error",
+      error: r.ok ? null : r.error,
+    });
   }
 
   if (x.result || x.error) {

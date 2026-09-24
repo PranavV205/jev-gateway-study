@@ -15,7 +15,7 @@ export interface ScreenRun {
   latencyMs: number;
 }
 
-async function settle<T>(fn: () => Promise<T>): Promise<Outcome<T>> {
+export async function settle<T>(fn: () => Promise<T>): Promise<Outcome<T>> {
   const start = Date.now();
   try {
     return { ok: true, score: await fn() };

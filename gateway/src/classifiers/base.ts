@@ -24,3 +24,16 @@ export interface Classifier {
   screenUser(text: string): Promise<UserScore>;
   screenChunk(text: string): Promise<ChunkScore>;
 }
+
+export interface RouteScore extends CallMeta {
+  taskType: string;
+  taskProbs: Record<string, number>;
+  confidence: number;
+  pNeedsStrong: number;
+}
+
+// A router classifies the user's question so the gateway can pick a model tier.
+export interface Router {
+  name: string;
+  route(question: string): Promise<RouteScore>;
+}

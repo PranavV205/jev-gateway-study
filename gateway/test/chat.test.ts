@@ -11,7 +11,23 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 // Fake network. Jev scores a text as an attack when it contains "ATTACK"; every other
-// text scores 0.02. Groq returns `groq` unless a status is given.
+// text scores 0.02. For routing, a question containing "Compare" is reasoning, one
+// containing "UNSURE" is split between lookup and reasoning, and anything else is a clear lookup.
+// Groq returns `groqReply` unless a status is given.
+function jevAnswer(question: string, state: string) {
+  if (question === "task_type") {
+    const probabilities = state.includes("Compare")
+      ? { reasoning: 0.92, lookup: 0.08 }
+      : state.includes("UNSURE")
+        ? { lookup: 0.55, reasoning: 0.45 }
+        : { lookup: 0.96, extraction: 0.04 };
+    const choice = Object.entries(probabilities).sort((a, b) => b[1] - a[1])[0]?.[0];
+    return { type: "choice", choice, confidence: 0.9, probabilities };
+  }
+  if (question === "needs_strong") return { type: "noul", noul: state.includes("Compare") ? 0.8 : 0.05 };
+  return { type: "noul", noul: state.includes("ATTACK") ? 0.97 : 0.02 };
+}
+
 function mockNetwork(opts: { jevStatus?: number; groqStatus?: number } = {}) {
   const jevCalls: { state: string; questions: string[] }[] = [];
   const groqCalls: { model: string; messages: { content: string }[] }[] = [];
@@ -23,8 +39,7 @@ function mockNetwork(opts: { jevStatus?: number; groqStatus?: number } = {}) {
     if (url.startsWith("https://api.typesafe.ai/")) {
       jevCalls.push({ state: body.state, questions: Object.keys(body.questions) });
       if (opts.jevStatus) return json(opts.jevStatus, { error: "unavailable" });
-      const p = String(body.state).includes("ATTACK") ? 0.97 : 0.02;
-      const answers = Object.fromEntries(Object.keys(body.questions).map((q) => [q, { type: "noul", noul: p }]));
+      const answers = Object.fromEntries(Object.keys(body.questions).map((q) => [q, jevAnswer(q, String(body.state))]));
       return json(200, { model: "jev-1.13.0", answers, usage: { input_tokens: 300, output_tokens: 20 } });
     }
 
@@ -60,6 +75,7 @@ async function trace(requestId: string) {
   return (await res.json()) as {
     request: Record<string, unknown>;
     screen_results: Record<string, unknown>[];
+    route_decision: Record<string, unknown> | null;
     llm_calls: Record<string, unknown>[];
   };
 }
@@ -72,6 +88,7 @@ interface Body {
     dropped_chunks: string[];
     tier: string | null;
     model: string | null;
+    route: { router: string; task_type: string | null; tier: string; reason: string };
     cost_usd: number;
     baseline_cost_usd: number;
     screen: {
@@ -103,30 +120,35 @@ describe("GET /healthz", () => {
 });
 
 describe("POST /v1/chat", () => {
-  it("screens a clean request, answers on the strong tier, and logs everything", async () => {
+  it("screens and routes a clean lookup to the cheap tier, and logs everything", async () => {
     const net = mockNetwork();
     const res = await call("POST", "/v1/chat", request());
     expect(res.status).toBe(200);
     const body = (await res.json()) as Body;
 
     expect(body.answer).toBe("The total due is $12,214.80.");
-    expect(body.gateway).toMatchObject({ action: "allowed", tier: "strong", dropped_chunks: [] });
+    expect(body.gateway).toMatchObject({ action: "allowed", tier: "cheap", model: "openai/gpt-oss-20b" });
+    expect(body.gateway.route).toMatchObject({ router: "jev", task_type: "lookup", reason: "cheap_task" });
     expect(body.gateway.screen?.chunks.map((c) => c.action)).toEqual(["kept", "kept"]);
 
-    // One Jev call for the user message, one per chunk, each with the right questions.
-    expect(net.jevCalls).toHaveLength(3);
-    expect(net.jevCalls.find((c) => c.state === "What is the total due?")?.questions).toEqual(["user_injection"]);
+    // Jev calls: user message screen, one per chunk, and one routing call, each with the right questions.
+    expect(net.jevCalls).toHaveLength(4);
+    const onQuestion = net.jevCalls.filter((c) => c.state === "What is the total due?").map((c) => c.questions);
+    expect(onQuestion).toContainEqual(["user_injection"]);
+    expect(onQuestion).toContainEqual(["task_type", "needs_strong"]);
     expect(net.jevCalls.find((c) => c.state === "Payment terms: net 30")?.questions).toEqual([
       "chunk_injection",
       "exfiltration",
     ]);
 
-    // Cost = model call (400 in, 60 out on gpt-oss-120b) + 3 Jev calls of 300 input tokens.
-    expect(body.gateway.cost_usd).toBeCloseTo(0.000096 + (3 * 300 * 0.042) / 1e6, 9);
+    // Cost = model call (400 in, 60 out on gpt-oss-20b) + 4 Jev calls of 300 input tokens.
+    // Baseline = the same tokens on gpt-oss-120b, with no Jev calls.
+    expect(body.gateway.cost_usd).toBeCloseTo(0.000048 + (4 * 300 * 0.042) / 1e6, 9);
     expect(body.gateway.baseline_cost_usd).toBeCloseTo(0.000096, 9);
 
     const t = await trace(body.gateway.request_id);
-    expect(t.request).toMatchObject({ action: "allowed", classifier: "jev", flagged: false });
+    expect(t.request).toMatchObject({ action: "allowed", classifier: "jev", router: "jev", routeReason: "cheap_task" });
+    expect(t.route_decision).toMatchObject({ taskType: "lookup", tier: "cheap", status: "ok" });
     expect(t.screen_results).toHaveLength(3);
     expect(t.screen_results.every((r) => r.status === "ok" && r.model === "jev-1.13.0")).toBe(true);
     expect(t.llm_calls[0]).toMatchObject({ inputTokens: 400, outputTokens: 60, reasoningTokens: 20 });
@@ -183,6 +205,8 @@ describe("POST /v1/chat", () => {
     expect(body.gateway.screen?.flagged).toBe(true);
     expect(body.gateway.screen?.user).toEqual({ p_injection: null, reason: "screen_failed" });
     expect(body.gateway.dropped_chunks).toEqual(["c1", "c2"]);
+    expect(body.gateway.route).toMatchObject({ tier: "strong", reason: "route_failed" });
+    expect(net.groqCalls[0]?.model).toBe("openai/gpt-oss-120b");
     expect(net.groqCalls[0]?.messages[1]?.content).toContain("(no context provided)");
 
     const t = await trace(body.gateway.request_id);
@@ -190,27 +214,53 @@ describe("POST /v1/chat", () => {
     expect(t.screen_results.every((r) => r.status === "error")).toBe(true);
   });
 
-  it("skips screening when the classifier is none", async () => {
+  it("skips screening when the classifier is none, but still routes", async () => {
     const net = mockNetwork();
     const res = await call("POST", "/v1/chat", request({ options: { classifier: "none" } }));
     const body = (await res.json()) as Body;
-    expect(net.jevCalls).toHaveLength(0);
+    expect(net.jevCalls.map((c) => c.questions)).toEqual([["task_type", "needs_strong"]]);
     expect(body.gateway.screen).toBeNull();
     expect(body.gateway.action).toBe("allowed");
   });
 
-  it("uses the cheap tier when forced", async () => {
-    mockNetwork();
-    const res = await call("POST", "/v1/chat", request({ options: { force_tier: "cheap" } }));
+  it("uses a forced tier without calling the router", async () => {
+    const net = mockNetwork();
+    const res = await call("POST", "/v1/chat", request({ options: { force_tier: "strong" } }));
     const body = (await res.json()) as Body;
-    expect(body.gateway).toMatchObject({ tier: "cheap", model: "openai/gpt-oss-20b" });
+    expect(body.gateway).toMatchObject({ tier: "strong", model: "openai/gpt-oss-120b" });
+    expect(body.gateway.route.reason).toBe("forced");
+    expect(net.jevCalls.some((c) => c.questions.includes("task_type"))).toBe(false);
+  });
+
+  it("routes a reasoning question to the strong tier", async () => {
+    mockNetwork();
+    const res = await call("POST", "/v1/chat", request({ user_message: "Compare the payment terms and explain." }));
+    const body = (await res.json()) as Body;
+    expect(body.gateway.route).toMatchObject({ task_type: "reasoning", tier: "strong", reason: "strong_task" });
+  });
+
+  it("sends a question split between lookup and reasoning to the strong tier", async () => {
+    mockNetwork();
+    const res = await call("POST", "/v1/chat", request({ user_message: "UNSURE what is due?" }));
+    const body = (await res.json()) as Body;
+    expect(body.gateway.route).toMatchObject({ task_type: "lookup", tier: "strong", reason: "strong_task" });
+  });
+
+  it("always uses the strong tier when the router is none", async () => {
+    const net = mockNetwork();
+    const res = await call("POST", "/v1/chat", request({ options: { router: "none" } }));
+    const body = (await res.json()) as Body;
+    expect(body.gateway.route).toMatchObject({ router: "none", tier: "strong", reason: "no_router" });
+    expect(net.jevCalls).toHaveLength(3);
+    const t = await trace(body.gateway.request_id);
+    expect(t.route_decision).toBeNull();
   });
 
   it("screens but skips the model call on a dry run", async () => {
     const net = mockNetwork();
     const res = await call("POST", "/v1/chat", request({ options: { dry_run: true } }));
     const body = (await res.json()) as Body;
-    expect(net.jevCalls).toHaveLength(3);
+    expect(net.jevCalls).toHaveLength(4);
     expect(net.groqCalls).toHaveLength(0);
     expect(body.answer).toBeNull();
     expect(body.gateway.screen?.chunks).toHaveLength(2);

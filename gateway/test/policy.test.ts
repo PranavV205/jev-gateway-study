@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { type ChunkInput, decideChunk, decideScreen, type FailPolicy, type Thresholds } from "../src/policy";
+import {
+  type ChunkInput,
+  decideChunk,
+  decideRoute,
+  decideScreen,
+  type FailPolicy,
+  type RouteRules,
+  type Thresholds,
+} from "../src/policy";
 
 const t: Thresholds = { userInjection: 0.3, chunkInjection: 0.5, exfiltration: 0.5 };
 const fail: FailPolicy = { user: "allow", chunk: "drop" };
@@ -76,5 +84,50 @@ describe("decideScreen", () => {
       flagged: false,
       userReason: "screen_failed",
     });
+  });
+});
+
+describe("decideRoute", () => {
+  const rules: RouteRules = { cheapTasks: ["lookup", "extraction"], minCheapProbability: 0.8, maxNeedsStrong: 0.3 };
+  const auto = { forced: null, failed: false };
+  const r = (taskProbs: Record<string, number>, pNeedsStrong = 0.05) => ({ taskProbs, pNeedsStrong });
+
+  it.each([
+    ["clear lookup", r({ lookup: 0.95, reasoning: 0.05 }), { tier: "cheap", reason: "cheap_task" }],
+    [
+      "split between the two cheap types",
+      r({ lookup: 0.45, extraction: 0.45, other: 0.1 }),
+      { tier: "cheap", reason: "cheap_task" },
+    ],
+    [
+      "cheap probability exactly at the minimum",
+      r({ lookup: 0.8, summary: 0.2 }),
+      { tier: "cheap", reason: "cheap_task" },
+    ],
+    [
+      "cheap probability just under the minimum",
+      r({ lookup: 0.79, reasoning: 0.21 }),
+      { tier: "strong", reason: "strong_task" },
+    ],
+    ["reasoning", r({ reasoning: 0.99, lookup: 0.01 }), { tier: "strong", reason: "strong_task" }],
+    ["other", r({ other: 0.9, lookup: 0.1 }), { tier: "strong", reason: "strong_task" }],
+    ["cheap task that needs strong", r({ lookup: 0.95 }, 0.3), { tier: "strong", reason: "needs_strong" }],
+  ] as const)("%s", (_, input, expected) => {
+    expect(decideRoute(input, rules, auto)).toEqual(expected);
+  });
+
+  it("honors a forced tier over everything", () => {
+    expect(decideRoute(r({ reasoning: 1 }, 0.9), rules, { forced: "cheap", failed: false })).toEqual({
+      tier: "cheap",
+      reason: "forced",
+    });
+  });
+
+  it("falls back to strong when routing failed or was skipped", () => {
+    expect(decideRoute(null, rules, { forced: null, failed: true })).toEqual({
+      tier: "strong",
+      reason: "route_failed",
+    });
+    expect(decideRoute(null, rules, auto)).toEqual({ tier: "strong", reason: "no_router" });
   });
 });

@@ -1,6 +1,6 @@
-import { noul, TypeSafeClient } from "@typesafe-ai/sdk";
+import { choice, noul, TypeSafeClient } from "@typesafe-ai/sdk";
 import { config, costUsd } from "../config";
-import type { ChunkScore, Classifier, UserScore } from "./base";
+import type { ChunkScore, Classifier, Router, RouteScore, UserScore } from "./base";
 
 const { questions } = config.screening;
 const ask = (q: { instructions: string; criteria: { true: string; false: string } }) =>
@@ -12,7 +12,13 @@ const chunkQuestions = {
   exfiltration: ask(questions.exfiltration),
 };
 
-export class JevClassifier implements Classifier {
+const routing = config.routing.questions;
+const routeQuestions = {
+  task_type: choice(routing.task_type.instructions, routing.task_type.criteria),
+  needs_strong: noul(routing.needs_strong.instructions),
+};
+
+export class JevClassifier implements Classifier, Router {
   readonly name = "jev";
   private readonly client: TypeSafeClient;
 
@@ -40,6 +46,19 @@ export class JevClassifier implements Classifier {
     return {
       pInjection: res.answers.chunk_injection.noul,
       pExfil: res.answers.exfiltration.noul,
+      ...this.meta(res, start),
+    };
+  }
+
+  async route(question: string): Promise<RouteScore> {
+    const start = Date.now();
+    const res = await this.client.systemOne({ state: question, questions: routeQuestions });
+    const task = res.answers.task_type;
+    return {
+      taskType: task.choice,
+      taskProbs: { ...task.probabilities },
+      confidence: task.confidence,
+      pNeedsStrong: res.answers.needs_strong.noul,
       ...this.meta(res, start),
     };
   }

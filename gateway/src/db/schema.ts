@@ -12,12 +12,15 @@ export const requests = sqliteTable("requests", {
   // The user message could not be screened but was let through (fail policy "allow").
   flagged: integer("flagged", { mode: "boolean" }).notNull().default(false),
   classifier: text("classifier").notNull().default("none"),
+  router: text("router").notNull().default("none"),
+  routeReason: text("route_reason"),
   tier: text("tier", { enum: ["cheap", "strong"] }),
   provider: text("provider"),
   model: text("model"),
   // Total cost: screening plus the model call.
   costUsd: real("cost_usd").notNull(),
   screenCostUsd: real("screen_cost_usd").notNull().default(0),
+  routeCostUsd: real("route_cost_usd").notNull().default(0),
   // What the model call would have cost on the strong tier, with no screening.
   baselineCostUsd: real("baseline_cost_usd").notNull(),
   latencyMs: integer("latency_ms").notNull(),
@@ -63,4 +66,25 @@ export const screenResults = sqliteTable("screen_results", {
   status: text("status", { enum: ["ok", "error"] }).notNull(),
   error: text("error"),
   rawJson: text("raw_json"),
+});
+
+// One row per routing call.
+export const routeDecisions = sqliteTable("route_decisions", {
+  id: text("id").primaryKey(),
+  requestId: text("request_id")
+    .notNull()
+    .references(() => requests.id),
+  router: text("router").notNull(),
+  model: text("model"),
+  taskType: text("task_type"),
+  taskProbsJson: text("task_probs_json"),
+  confidence: real("confidence"),
+  pNeedsStrong: real("p_needs_strong"),
+  tier: text("tier", { enum: ["cheap", "strong"] }).notNull(),
+  reason: text("reason").notNull(),
+  inputTokens: integer("input_tokens").notNull(),
+  costUsd: real("cost_usd").notNull(),
+  latencyMs: integer("latency_ms").notNull(),
+  status: text("status", { enum: ["ok", "error"] }).notNull(),
+  error: text("error"),
 });

@@ -82,5 +82,26 @@
     "maxChunks": 10,
     "maxChunkChars": 4000,
     "maxUserMessageChars": 4000
+  },
+  "routing": {
+    "_note": "A request goes to the cheap tier only when the combined probability of the cheap task types is at least minCheapProbability and needs_strong is below maxNeedsStrong. Everything else goes to the strong tier. Thresholds are starting points, to be tuned against both-model results.",
+    "cheapTasks": ["lookup", "extraction"],
+    "minCheapProbability": 0.8,
+    "maxNeedsStrong": 0.3,
+    "questions": {
+      "task_type": {
+        "instructions": "What kind of task is the user asking for?",
+        "criteria": {
+          "lookup": "A single fact stated directly in the document",
+          "extraction": "Pull out specific fields, names, or lists",
+          "summary": "Condense a section or the whole document",
+          "reasoning": "Combine several facts, compare, calculate, or explain why",
+          "other": "None of the above, or unclear"
+        }
+      },
+      "needs_strong": {
+        "instructions": "Does answering well require combining several separate facts, multi-step reasoning, or careful judgment?"
+      }
+    }
   }
 }

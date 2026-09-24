@@ -20,6 +20,14 @@ interface GatewayReport {
   dropped_chunks: string[];
   tier: string | null;
   model: string | null;
+  route: {
+    router: string;
+    task_type: string | null;
+    confidence: number | null;
+    p_needs_strong: number | null;
+    tier: string;
+    reason: string;
+  };
   screen: {
     classifier: string;
     flagged: boolean;
@@ -28,7 +36,7 @@ interface GatewayReport {
   } | null;
   cost_usd: number;
   baseline_cost_usd: number;
-  latency_ms: { screen: number; model: number; total: number };
+  latency_ms: { screen: number; route: number; model: number; total: number };
   error?: string;
 }
 
@@ -92,13 +100,28 @@ function row(label: string, value: string) {
 const usd = (n: number) => `$${n.toFixed(6)}`;
 const score = (p: number | null) => (p === null ? "not screened" : p.toFixed(2));
 
+const ROUTE_REASONS: Record<string, string> = {
+  cheap_task: "simple task, confident",
+  strong_task: "not clearly a simple lookup or extraction",
+  needs_strong: "router says it needs careful reasoning",
+  route_failed: "router failed, defaulting to strong",
+  no_router: "routing off",
+  forced: "forced",
+};
+
+function describeRoute(r: GatewayReport["route"]) {
+  const why = ROUTE_REASONS[r.reason] ?? r.reason;
+  if (!r.task_type || r.confidence === null) return `${r.tier} tier (${why})`;
+  return `${r.task_type} (confidence ${r.confidence.toFixed(2)}, needs strong ${score(r.p_needs_strong)}) → ${r.tier} tier, ${why}`;
+}
+
 // gpt-oss often uses narrow no-break spaces and non-breaking hyphens, which some fonts
 // render with no visible gap, and sometimes adds Markdown bold despite the prompt.
 // Answers are shown as plain text, so normalize those before display.
 const plain = (s: string) =>
   s
-    .replace(/[   ]/g, " ")
-    .replace(/[‐‑]/g, "-")
+    .replace(/[\u00a0\u202f\u2007]/g, " ")
+    .replace(/[\u2010\u2011]/g, "-")
     .replace(/\*\*(.+?)\*\*/g, "$1");
 
 // Appends the chosen test attack to the first chunk, so it always reaches the gateway.
@@ -157,11 +180,12 @@ function render(answer: string | null, report: GatewayReport, sent: Chunk[], pla
 
   reportEl.replaceChildren(
     ...row("Action", report.action),
-    ...row("Model", report.model ? `${report.model} (${report.tier} tier)` : "none called"),
+    ...row("Route", describeRoute(report.route)),
+    ...row("Model", report.model ?? "none called"),
     ...row("Cost", `${usd(report.cost_usd)} (all-strong baseline ${usd(report.baseline_cost_usd)})`),
     ...row(
       "Latency",
-      `${report.latency_ms.total} ms total: ${report.latency_ms.screen} ms screening, ${report.latency_ms.model} ms model`,
+      `${report.latency_ms.total} ms total: ${report.latency_ms.screen} ms screening and ${report.latency_ms.route} ms routing (in parallel), ${report.latency_ms.model} ms model`,
     ),
     ...row("Request ID", report.request_id),
     ...(report.error ? row("Error", report.error) : []),
