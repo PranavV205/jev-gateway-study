@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { llmCalls, requests, routeDecisions, screenResults } from "./db/schema";
 import { handleChat } from "./pipeline";
 import { chatRequestSchema } from "./schemas";
+import { listApps, loadStats, type Range } from "./stats";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -32,6 +33,16 @@ app.get("/v1/requests/:id", async (c) => {
     db.select().from(llmCalls).where(eq(llmCalls.requestId, id)),
   ]);
   return c.json({ request, screen_results: screens, route_decision: routes[0] ?? null, llm_calls: calls });
+});
+
+const RANGES: Range[] = ["24h", "7d", "30d", "all"];
+
+app.get("/v1/stats", async (c) => {
+  const range = (c.req.query("range") ?? "7d") as Range;
+  if (!RANGES.includes(range)) return c.json({ error: "invalid_range", allowed: RANGES }, 400);
+  const appId = c.req.query("app") || null;
+  const [stats, apps] = await Promise.all([loadStats(c.env.DB, range, appId), listApps(c.env.DB)]);
+  return c.json({ ...stats, app: appId, apps });
 });
 
 export default app;

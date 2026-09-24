@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gateway dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%232a78d6%22/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Gateway dashboard</h1>
+        <p id="subtitle">What the gateway screened, routed, and spent.</p>
+      </div>
+      <form id="filters" class="filters">
+        <label>
+          <span>Range</span>
+          <select id="range">
+            <option value="24h">Last 24 hours</option>
+            <option value="7d" selected>Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="all">All time</option>
+          </select>
+        </label>
+        <label>
+          <span>App</span>
+          <select id="app"><option value="">All apps</option></select>
+        </label>
+        <button type="button" id="refresh">Refresh</button>
+      </form>
+    </header>
+
+    <main id="main">
+      <p id="error" role="alert" hidden></p>
+      <p id="empty" hidden>No requests in this range yet. Ask a few questions in doc-qa and refresh.</p>
+
+      <section id="content">
+        <div class="hero card">
+          <p class="label">Gateway cost vs. always using the strong model</p>
+          <p id="hero-value" class="hero-value"></p>
+          <p id="hero-detail" class="detail"></p>
+        </div>
+
+        <div id="tiles" class="tiles"></div>
+
+        <div class="grid">
+          <article class="card wide">
+            <h2>Cost over time</h2>
+            <p class="detail">Stacked: model calls, Jev screening, Jev routing. Line: the same answers on the strong model with no gateway.</p>
+            <div id="chart-cost" class="chart"></div>
+          </article>
+
+          <article class="card">
+            <h2>Routing by task type</h2>
+            <p class="detail">Which model each kind of question went to.</p>
+            <div id="chart-routing" class="chart"></div>
+          </article>
+
+          <article class="card">
+            <h2>Threats caught</h2>
+            <p class="detail">Refused questions and dropped chunks, by reason.</p>
+            <div id="chart-threats" class="chart"></div>
+          </article>
+
+          <article class="card">
+            <h2>Chunk injection scores</h2>
+            <p class="detail">How Jev scored every screened chunk. Chunks at or above the line are dropped.</p>
+            <div id="chart-chunk-scores" class="chart"></div>
+          </article>
+
+          <article class="card">
+            <h2>Question injection scores</h2>
+            <p class="detail">How Jev scored every user question. Questions at or above the line are refused.</p>
+            <div id="chart-user-scores" class="chart"></div>
+          </article>
+
+          <article class="card">
+            <h2>Latency</h2>
+            <p class="detail">Milliseconds. Screening and routing run in parallel before the model call.</p>
+            <table id="latency" class="data"></table>
+          </article>
+
+          <article class="card">
+            <h2>Model calls</h2>
+            <p class="detail">Every attempt, including retries, fallbacks, and escalations.</p>
+            <table id="attempts" class="data"></table>
+          </article>
+
+          <article class="card wide">
+            <h2>Recent cases worth a look</h2>
+            <p class="detail">Borderline scores, unsure routes, fallbacks, and errors. Newest first.</p>
+            <div class="table-scroll"><table id="recent" class="data"></table></div>
+          </article>
+        </div>
+
+        <p id="note" class="detail note"></p>
+      </section>
+    </main>
+
+    <div id="tooltip" class="tooltip" role="status" hidden></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

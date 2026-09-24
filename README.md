@@ -7,6 +7,7 @@ Work in progress. So far:
 - `experiments/`: tests of Jev as an injection screen. See the READMEs in [`smoke`](experiments/smoke), [`hard-cases`](experiments/hard-cases), and [`question-wording`](experiments/question-wording).
 - `corpus/`: fictional business documents and questions for the demo app.
 - `gateway/`: a Cloudflare Worker (Hono, D1) with `POST /v1/chat`. It screens the user message and every chunk with Jev in parallel, refuses a prompt-injection attempt in the user message, drops chunks that look like planted instructions, and asks Jev what kind of task the question is. Clear lookups and extractions go to the cheap model, everything else to the strong one. Every screening and routing decision is logged. If Groq fails it retries with backoff, then falls back to a list of free OpenRouter models, and if the cheap tier fails entirely it escalates to the strong tier. Jev calls go through a rate limiter and a circuit breaker.
+- `apps/dashboard/`: a one-page dashboard over the gateway's logs: cost with the gateway vs. always using the strong model, routing by task type, threats caught, Jev score distributions, latency, retries and fallbacks, and recent borderline cases. It reads `GET /v1/stats`.
 - `apps/doc-qa/`: a small demo page. Pick a document from the corpus, ask a question, and see the answer plus the gateway's report, including each chunk's screening scores. It can plant a harmless test attack in a chunk so you can watch the gateway drop it.
 
 ## Run locally
@@ -19,7 +20,13 @@ cp gateway/.dev.vars.example gateway/.dev.vars   # then add your keys
 npm run dev
 ```
 
-This starts the gateway at http://localhost:8000 and doc-qa at http://localhost:5173.
+This starts the gateway at http://localhost:8000, doc-qa at http://localhost:5173, and the dashboard at http://localhost:5174.
+
+To fill the dashboard, send the corpus questions through the gateway (some with planted test attacks, plus a few attack questions):
+
+```sh
+npm run demo:traffic
+```
 
 To call the gateway directly:
 

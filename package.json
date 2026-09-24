@@ -4,18 +4,20 @@
   "type": "module",
   "workspaces": [
     "gateway",
-    "apps/doc-qa"
+    "apps/doc-qa",
+    "apps/dashboard"
   ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "dev": "concurrently -k -n gateway,doc-qa -c blue,green \"npm run dev -w gateway\" \"npm run dev -w doc-qa\"",
-    "test": "npm test --workspaces",
+    "dev": "concurrently -k -n gateway,doc-qa,dashboard -c blue,green,magenta \"npm run dev -w gateway\" \"npm run dev -w doc-qa\" \"npm run dev -w dashboard\"",
+    "test": "npm test -w gateway -w doc-qa",
     "typecheck": "npm run typecheck --workspaces",
-    "build": "npm run build -w doc-qa",
+    "build": "npm run build -w doc-qa -w dashboard",
     "lint": "biome check .",
-    "format": "biome check --write ."
+    "format": "biome check --write .",
+    "demo:traffic": "node --experimental-strip-types --no-warnings scripts/demo-traffic.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
