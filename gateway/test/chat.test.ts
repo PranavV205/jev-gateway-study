@@ -1,5 +1,6 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { jevBreaker } from "../src/classifiers/jev";
 import app from "../src/index";
 
 const groqReply = {
@@ -28,9 +29,17 @@ function jevAnswer(question: string, state: string) {
   return { type: "noul", noul: state.includes("ATTACK") ? 0.97 : 0.02 };
 }
 
-function mockNetwork(opts: { jevStatus?: number; groqStatus?: number } = {}) {
+interface NetOpts {
+  jevStatus?: number;
+  groqStatus?: number;
+  groqRetryAfter?: string;
+  openrouterStatus?: number;
+}
+
+function mockNetwork(opts: NetOpts = {}) {
   const jevCalls: { state: string; questions: string[] }[] = [];
   const groqCalls: { model: string; messages: { content: string }[] }[] = [];
+  const openrouterCalls: { models: string[] }[] = [];
 
   const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input instanceof Request ? input.url : input);
@@ -45,14 +54,24 @@ function mockNetwork(opts: { jevStatus?: number; groqStatus?: number } = {}) {
 
     if (url.startsWith("https://api.groq.com/")) {
       groqCalls.push(body);
-      if (opts.groqStatus) return json(opts.groqStatus, { error: { message: "Rate limit reached" } });
+      if (opts.groqStatus) {
+        const res = json(opts.groqStatus, { error: { message: "Rate limit reached" } });
+        if (opts.groqRetryAfter) res.headers.set("retry-after", opts.groqRetryAfter);
+        return res;
+      }
       return json(200, groqReply);
+    }
+
+    if (url.startsWith("https://openrouter.ai/")) {
+      openrouterCalls.push(body);
+      if (opts.openrouterStatus) return json(opts.openrouterStatus, { error: { message: "Upstream rate limit" } });
+      return json(200, { ...groqReply, model: body.models[0] });
     }
 
     throw new Error(`Unexpected fetch to ${url}`);
   });
 
-  return { spy, jevCalls, groqCalls };
+  return { spy, jevCalls, groqCalls, openrouterCalls };
 }
 
 async function call(method: string, path: string, body?: unknown) {
@@ -89,6 +108,7 @@ interface Body {
     tier: string | null;
     model: string | null;
     route: { router: string; task_type: string | null; tier: string; reason: string };
+    llm_attempts: { kind: string; tier: string; provider: string; model: string; ok: boolean }[];
     cost_usd: number;
     baseline_cost_usd: number;
     screen: {
@@ -110,7 +130,10 @@ const request = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  jevBreaker.reset();
+});
 
 describe("GET /healthz", () => {
   it("returns ok", async () => {
@@ -266,15 +289,66 @@ describe("POST /v1/chat", () => {
     expect(body.gateway.screen?.chunks).toHaveLength(2);
   });
 
-  it("returns 502 and logs the error when the provider fails", async () => {
-    mockNetwork({ groqStatus: 429 });
+  it("falls back to OpenRouter when Groq is rate limited for a long time", async () => {
+    const net = mockNetwork({ groqStatus: 429, groqRetryAfter: "60" });
+    const res = await call("POST", "/v1/chat", request());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Body;
+    expect(body.answer).toBe("The total due is $12,214.80.");
+    expect(body.gateway).toMatchObject({
+      tier: "cheap",
+      provider: "openrouter",
+      model: "google/gemma-4-26b-a4b-it:free",
+    });
+    expect(body.gateway.llm_attempts.map((a) => [a.kind, a.provider, a.ok])).toEqual([
+      ["primary", "groq", false],
+      ["fallback", "openrouter", true],
+    ]);
+    expect(net.openrouterCalls).toHaveLength(1);
+
+    const t = await trace(body.gateway.request_id);
+    expect(t.llm_calls.map((c) => [c.attempt, c.kind, c.status])).toEqual([
+      [1, "primary", "error"],
+      [2, "fallback", "ok"],
+    ]);
+  });
+
+  it("returns 502 and logs every attempt when all providers fail", async () => {
+    mockNetwork({ groqStatus: 429, groqRetryAfter: "60", openrouterStatus: 503 });
     const res = await call("POST", "/v1/chat", request());
     expect(res.status).toBe(502);
     const body = (await res.json()) as Body;
     expect(body.gateway.action).toBe("error");
-    expect(body.gateway.error).toContain("429");
+    expect(body.gateway.error).toContain("503");
+    // Cheap primary and fallback, then the strong tier gets a turn.
+    expect(body.gateway.llm_attempts.map((a) => [a.kind, a.tier])).toEqual([
+      ["primary", "cheap"],
+      ["fallback", "cheap"],
+      ["escalation", "strong"],
+      ["fallback", "strong"],
+    ]);
     const t = await trace(body.gateway.request_id);
-    expect(t.llm_calls[0]).toMatchObject({ status: "error" });
+    expect(t.llm_calls).toHaveLength(4);
+    expect(t.llm_calls.every((c) => c.status === "error")).toBe(true);
+  });
+
+  it("opens the Jev circuit after repeated failures and stops calling Jev", async () => {
+    const net = mockNetwork({ jevStatus: 503 });
+    // Each request makes 4 Jev calls in parallel, so they all start before any of them fails.
+    // Two failing requests take the breaker past its threshold of 5.
+    await call("POST", "/v1/chat", request());
+    await call("POST", "/v1/chat", request());
+    expect(jevBreaker.state).toBe("open");
+
+    const before = net.jevCalls.length;
+    const res = await call("POST", "/v1/chat", request());
+    const body = (await res.json()) as Body;
+    expect(net.jevCalls.length).toBe(before);
+    expect(body.gateway.action).toBe("allowed");
+    expect(body.gateway.screen?.flagged).toBe(true);
+    expect(body.gateway.route.reason).toBe("route_failed");
+    const t = await trace(body.gateway.request_id);
+    expect(t.screen_results.every((r) => String(r.error).includes("circuit is open"))).toBe(true);
   });
 
   it("rejects an invalid body", async () => {

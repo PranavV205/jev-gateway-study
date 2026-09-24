@@ -16,7 +16,7 @@ export default defineConfig(async () => {
             RUN_LIVE: live ? "1" : "0",
             GROQ_API_KEY: live ? (process.env.GROQ_API_KEY ?? "") : "test-groq-key",
             TYPESAFE_API_KEY: live ? (process.env.TYPESAFE_API_KEY ?? "") : "test-typesafe-key",
-            OPENROUTER_API_KEY: "",
+            OPENROUTER_API_KEY: live ? (process.env.OPENROUTER_API_KEY ?? "") : "test-openrouter-key",
           },
         },
       }),

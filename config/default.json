@@ -3,11 +3,23 @@
   "tiers": {
     "cheap": {
       "provider": "groq",
-      "model": "openai/gpt-oss-20b"
+      "model": "openai/gpt-oss-20b",
+      "fallback": {
+        "provider": "openrouter",
+        "models": ["google/gemma-4-26b-a4b-it:free", "qwen/qwen3.8-27b:free", "nvidia/nemotron-3-super-120b-a12b:free"]
+      }
     },
     "strong": {
       "provider": "groq",
-      "model": "openai/gpt-oss-120b"
+      "model": "openai/gpt-oss-120b",
+      "fallback": {
+        "provider": "openrouter",
+        "models": [
+          "nvidia/nemotron-3-super-120b-a12b:free",
+          "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "google/gemma-4-31b-it:free"
+        ]
+      }
     }
   },
   "providers": {
@@ -19,7 +31,7 @@
     }
   },
   "prices": {
-    "_note": "USD per million tokens, published paid prices. Calls in this project run on free tiers.",
+    "_note": "USD per million tokens, published paid prices. Calls in this project run on free tiers. A ':free' model is priced as its paid version.",
     "openai/gpt-oss-20b": {
       "input": 0.075,
       "output": 0.3
@@ -31,17 +43,56 @@
     "jev-1.13.0": {
       "input": 0.042,
       "output": 0
+    },
+    "google/gemma-4-26b-a4b-it": {
+      "input": 0.09,
+      "output": 0.3
+    },
+    "google/gemma-4-31b-it": {
+      "input": 0.09,
+      "output": 0.34
+    },
+    "qwen/qwen3.8-27b": {
+      "input": 0.42,
+      "output": 3.0
+    },
+    "nvidia/nemotron-3-super-120b-a12b": {
+      "input": 0.08,
+      "output": 0.45
+    },
+    "nvidia/nemotron-3-ultra-550b-a55b": {
+      "input": 0.6,
+      "output": 2.4
     }
   },
   "llm": {
     "reasoningEffort": "low",
     "maxOutputTokens": 1024,
-    "timeoutMs": 60000
+    "timeoutMs": 60000,
+    "_retry": "Retries apply to the primary provider on network errors, 429 and 5xx. A retry-after longer than maxRetryAfterMs skips straight to the fallback.",
+    "retry": {
+      "maxRetries": 2,
+      "backoffInitialMs": 300,
+      "backoffMaxMs": 2000,
+      "maxRetryAfterMs": 2000
+    },
+    "_escalate": "If every cheap-tier attempt fails or returns an empty answer, try the strong tier.",
+    "escalateCheapFailures": true
   },
   "jev": {
     "model": "jev-1.13.0",
     "timeoutMs": 3000,
-    "maxRetries": 1
+    "maxRetries": 1,
+    "_circuitBreaker": "After failureThreshold consecutive failed Jev calls, skip Jev for cooldownMs and apply the fail policies directly.",
+    "circuitBreaker": {
+      "failureThreshold": 5,
+      "cooldownMs": 30000
+    },
+    "_rateLimit": "Per Worker instance, set to 80% of Jev's 1,200 requests per minute.",
+    "rateLimit": {
+      "requestsPerSecond": 16,
+      "burst": 16
+    }
   },
   "screening": {
     "_failPolicy": "What to do when a text could not be screened. user: 'allow' (flag it) or 'refuse'. chunk: 'drop' or 'keep'.",

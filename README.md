@@ -6,7 +6,7 @@ Work in progress. So far:
 
 - `experiments/`: tests of Jev as an injection screen. See the READMEs in [`smoke`](experiments/smoke), [`hard-cases`](experiments/hard-cases), and [`question-wording`](experiments/question-wording).
 - `corpus/`: fictional business documents and questions for the demo app.
-- `gateway/`: a Cloudflare Worker (Hono, D1) with `POST /v1/chat`. It screens the user message and every chunk with Jev in parallel, refuses a prompt-injection attempt in the user message, drops chunks that look like planted instructions, and asks Jev what kind of task the question is. Clear lookups and extractions go to the cheap model, everything else to the strong one. Every screening and routing decision is logged.
+- `gateway/`: a Cloudflare Worker (Hono, D1) with `POST /v1/chat`. It screens the user message and every chunk with Jev in parallel, refuses a prompt-injection attempt in the user message, drops chunks that look like planted instructions, and asks Jev what kind of task the question is. Clear lookups and extractions go to the cheap model, everything else to the strong one. Every screening and routing decision is logged. If Groq fails it retries with backoff, then falls back to a list of free OpenRouter models, and if the cheap tier fails entirely it escalates to the strong tier. Jev calls go through a rate limiter and a circuit breaker.
 - `apps/doc-qa/`: a small demo page. Pick a document from the corpus, ask a question, and see the answer plus the gateway's report, including each chunk's screening scores. It can plant a harmless test attack in a chunk so you can watch the gateway drop it.
 
 ## Run locally
@@ -37,9 +37,9 @@ The response has the answer plus a `gateway` block with the screening scores, dr
 npm run lint
 npm run typecheck
 npm test                 # gateway tests run inside the Workers runtime with a local D1
-RUN_LIVE=1 npm test      # also calls the real Jev API (needs keys in the environment)
+RUN_LIVE=1 npm test      # also calls the real Jev and OpenRouter APIs (needs keys in the environment)
 ```
 
 ## Stack
 
-TypeScript on Cloudflare Workers, [Hono](https://hono.dev), [Zod](https://zod.dev), [Drizzle](https://orm.drizzle.team) with D1, Vitest, Biome. doc-qa is plain TypeScript built with Vite. LLM calls go to Groq (`openai/gpt-oss-20b` and `openai/gpt-oss-120b`). Model names, prices, Jev questions, and thresholds live in [`config/default.json`](config/default.json).
+TypeScript on Cloudflare Workers, [Hono](https://hono.dev), [Zod](https://zod.dev), [Drizzle](https://orm.drizzle.team) with D1, Vitest, Biome. doc-qa is plain TypeScript built with Vite. LLM calls go to Groq (`openai/gpt-oss-20b` and `openai/gpt-oss-120b`), with free OpenRouter models as the fallback. Model names, prices, Jev questions, and thresholds live in [`config/default.json`](config/default.json).

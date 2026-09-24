@@ -19,6 +19,7 @@ interface GatewayReport {
   action: "allowed" | "refused" | "error";
   dropped_chunks: string[];
   tier: string | null;
+  provider: string | null;
   model: string | null;
   route: {
     router: string;
@@ -37,6 +38,7 @@ interface GatewayReport {
   cost_usd: number;
   baseline_cost_usd: number;
   latency_ms: { screen: number; route: number; model: number; total: number };
+  llm_attempts: { kind: string; tier: string; provider: string; model: string; ok: boolean; latency_ms: number }[];
   error?: string;
 }
 
@@ -181,7 +183,15 @@ function render(answer: string | null, report: GatewayReport, sent: Chunk[], pla
   reportEl.replaceChildren(
     ...row("Action", report.action),
     ...row("Route", describeRoute(report.route)),
-    ...row("Model", report.model ?? "none called"),
+    ...row("Model", report.model ? `${report.model} via ${report.provider}` : "none called"),
+    ...(report.llm_attempts.length > 1
+      ? row(
+          "Attempts",
+          report.llm_attempts
+            .map((a) => `${a.kind} ${a.provider} ${a.tier} ${a.ok ? "ok" : "failed"} (${a.latency_ms} ms)`)
+            .join(" → "),
+        )
+      : []),
     ...row("Cost", `${usd(report.cost_usd)} (all-strong baseline ${usd(report.baseline_cost_usd)})`),
     ...row(
       "Latency",

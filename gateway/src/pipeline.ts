@@ -4,7 +4,7 @@ import { JevClassifier } from "./classifiers/jev";
 import { config, costUsd, type Tier, tierModel } from "./config";
 import { llmCalls, requests, routeDecisions, screenResults } from "./db/schema";
 import { buildMessages } from "./prompt";
-import { type ChatResult, chat, ProviderError } from "./providers/chat";
+import { type AnswerRun, answer, type KeyFor } from "./providers/llm";
 import { type RouteRun, route, routeReport } from "./route";
 import type { ChatRequest } from "./schemas";
 import { type ScreenRun, screen, screenReport } from "./screen";
@@ -21,6 +21,8 @@ export interface GatewayReport {
   cost_usd: number;
   baseline_cost_usd: number;
   latency_ms: { screen: number; route: number; model: number; total: number };
+  // Every model call made for this request, in order: retries, fallbacks, and escalations included.
+  llm_attempts: { kind: string; tier: Tier; provider: string; model: string; ok: boolean; latency_ms: number }[];
   error?: string;
 }
 
@@ -34,10 +36,8 @@ async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function apiKeyFor(env: Env, provider: string): string {
-  const key = provider === "groq" ? env.GROQ_API_KEY : env.OPENROUTER_API_KEY;
-  if (!key) throw new Error(`Missing API key for provider ${provider}`);
-  return key;
+function keysFrom(env: Env): KeyFor {
+  return (provider) => (provider === "groq" ? env.GROQ_API_KEY : env.OPENROUTER_API_KEY) || undefined;
 }
 
 export function makeClassifier(env: Env, name: ChatRequest["options"]["classifier"]): Classifier | null {
@@ -66,32 +66,24 @@ export async function handleChat(
   const dropped = new Set(run.decision.chunks.filter((c) => c.action === "dropped").map((c) => c.id));
   const keptChunks = req.context_chunks.filter((c) => !dropped.has(c.id));
 
-  const tier: Tier = routed.tier;
-  const { provider, model } = tierModel(tier);
-  const strong = tierModel("strong");
+  const llm: AnswerRun | null =
+    refused || req.options.dry_run
+      ? null
+      : await answer(routed.tier, keysFrom(env), buildMessages(req.user_message, keptChunks, req.system_prompt));
 
-  let result: ChatResult | null = null;
-  let error: Error | null = null;
+  const final = llm?.final ?? null;
+  const result = final?.result ?? null;
+  const lastAttempt = llm?.attempts.at(-1) ?? null;
+  const error = llm && !final ? new Error(lastAttempt?.error ?? "No model call succeeded") : null;
+  // The tier and model that answered. After an escalation this is the strong tier even
+  // though the router picked cheap.
+  const answeredBy = final ?? lastAttempt;
 
-  if (!refused && !req.options.dry_run) {
-    try {
-      result = await chat(
-        provider,
-        apiKeyFor(env, provider),
-        model,
-        buildMessages(req.user_message, keptChunks, req.system_prompt),
-      );
-    } catch (err) {
-      error = err instanceof Error ? err : new Error(String(err));
-    }
-  }
-
-  const llmCost = result ? costUsd(model, result.inputTokens, result.outputTokens) : 0;
+  const llmCost = llm?.attempts.reduce((sum, a) => sum + a.costUsd, 0) ?? 0;
   // What the same tokens would have cost on the strong tier with no screening. Output length
   // would differ on another model, so this is an estimate.
-  const baselineCost = result ? costUsd(strong.model, result.inputTokens, result.outputTokens) : 0;
+  const baselineCost = result ? costUsd(tierModel("strong").model, result.inputTokens, result.outputTokens) : 0;
   const action = refused ? "refused" : error ? "error" : "allowed";
-  const calledModel = Boolean(result || error);
   const totalMs = Date.now() - start;
 
   await log(env, {
@@ -100,13 +92,13 @@ export async function handleChat(
     run,
     routed,
     action,
-    tier: calledModel ? tier : null,
-    provider: calledModel ? provider : null,
-    model: calledModel ? model : null,
+    tier: answeredBy?.tier ?? null,
+    provider: answeredBy?.provider ?? null,
+    model: answeredBy?.model ?? null,
     llmCost,
     baselineCost,
     totalMs,
-    result,
+    llm,
     error,
   });
 
@@ -116,9 +108,9 @@ export async function handleChat(
       request_id: requestId,
       action,
       dropped_chunks: [...dropped],
-      tier: calledModel ? tier : null,
-      provider: calledModel ? provider : null,
-      model: calledModel ? model : null,
+      tier: answeredBy?.tier ?? null,
+      provider: answeredBy?.provider ?? null,
+      model: answeredBy?.model ?? null,
       route: routeReport(routed),
       screen: screenReport(run),
       cost_usd: llmCost + run.costUsd + routed.costUsd,
@@ -126,9 +118,18 @@ export async function handleChat(
       latency_ms: {
         screen: run.latencyMs,
         route: routed.latencyMs,
-        model: result?.latencyMs ?? 0,
+        model: llm?.attempts.reduce((sum, a) => sum + a.latencyMs, 0) ?? 0,
         total: totalMs,
       },
+      llm_attempts:
+        llm?.attempts.map((a) => ({
+          kind: a.kind,
+          tier: a.tier,
+          provider: a.provider,
+          model: a.model,
+          ok: a.result !== null,
+          latency_ms: a.latencyMs,
+        })) ?? [],
       ...(error ? { error: error.message } : {}),
     },
   };
@@ -146,7 +147,7 @@ interface LogInput {
   llmCost: number;
   baselineCost: number;
   totalMs: number;
-  result: ChatResult | null;
+  llm: AnswerRun | null;
   error: Error | null;
 }
 
@@ -240,20 +241,25 @@ async function log(env: Env, x: LogInput) {
     });
   }
 
-  if (x.result || x.error) {
-    await db.insert(llmCalls).values({
+  const attempts = x.llm?.attempts ?? [];
+  const [first, ...rest] = attempts.map((a, i) =>
+    db.insert(llmCalls).values({
       id: crypto.randomUUID(),
       requestId: x.requestId,
       createdAt,
-      provider: x.provider ?? "",
-      model: x.model ?? "",
-      inputTokens: x.result?.inputTokens ?? 0,
-      outputTokens: x.result?.outputTokens ?? 0,
-      reasoningTokens: x.result?.reasoningTokens ?? 0,
-      costUsd: x.llmCost,
-      latencyMs: x.result?.latencyMs ?? (x.error instanceof ProviderError ? x.error.latencyMs : 0),
-      status: x.error ? "error" : "ok",
-      error: x.error?.message ?? null,
-    });
-  }
+      attempt: i + 1,
+      kind: a.kind,
+      tier: a.tier,
+      provider: a.provider,
+      model: a.model,
+      inputTokens: a.result?.inputTokens ?? 0,
+      outputTokens: a.result?.outputTokens ?? 0,
+      reasoningTokens: a.result?.reasoningTokens ?? 0,
+      costUsd: a.costUsd,
+      latencyMs: a.latencyMs,
+      status: a.result ? "ok" : "error",
+      error: a.error,
+    }),
+  );
+  if (first) await db.batch([first, ...rest]);
 }

@@ -1,5 +1,7 @@
 import { choice, noul, TypeSafeClient } from "@typesafe-ai/sdk";
 import { config, costUsd } from "../config";
+import { CircuitBreaker } from "../infra/circuit";
+import { TokenBucket } from "../infra/ratelimit";
 import type { ChunkScore, Classifier, Router, RouteScore, UserScore } from "./base";
 
 const { questions } = config.screening;
@@ -18,6 +20,14 @@ const routeQuestions = {
   needs_strong: noul(routing.needs_strong.instructions),
 };
 
+// Shared by every request handled by this Worker instance.
+export const jevBreaker = new CircuitBreaker(
+  "jev",
+  config.jev.circuitBreaker.failureThreshold,
+  config.jev.circuitBreaker.cooldownMs,
+);
+export const jevBucket = new TokenBucket(config.jev.rateLimit.requestsPerSecond, config.jev.rateLimit.burst);
+
 export class JevClassifier implements Classifier, Router {
   readonly name = "jev";
   private readonly client: TypeSafeClient;
@@ -33,7 +43,7 @@ export class JevClassifier implements Classifier, Router {
 
   async screenUser(text: string): Promise<UserScore> {
     const start = Date.now();
-    const res = await this.client.systemOne({ state: text, questions: userQuestions });
+    const res = await this.call(text, userQuestions);
     return {
       pInjection: res.answers.user_injection.noul,
       ...this.meta(res, start),
@@ -42,7 +52,7 @@ export class JevClassifier implements Classifier, Router {
 
   async screenChunk(text: string): Promise<ChunkScore> {
     const start = Date.now();
-    const res = await this.client.systemOne({ state: text, questions: chunkQuestions });
+    const res = await this.call(text, chunkQuestions);
     return {
       pInjection: res.answers.chunk_injection.noul,
       pExfil: res.answers.exfiltration.noul,
@@ -52,7 +62,7 @@ export class JevClassifier implements Classifier, Router {
 
   async route(question: string): Promise<RouteScore> {
     const start = Date.now();
-    const res = await this.client.systemOne({ state: question, questions: routeQuestions });
+    const res = await this.call(question, routeQuestions);
     const task = res.answers.task_type;
     return {
       taskType: task.choice,
@@ -61,6 +71,15 @@ export class JevClassifier implements Classifier, Router {
       pNeedsStrong: res.answers.needs_strong.noul,
       ...this.meta(res, start),
     };
+  }
+
+  // Every Jev call waits for a rate-limit token and goes through the circuit breaker, so a
+  // Jev outage costs one fast rejection per call instead of a timeout and a retry.
+  private call<Q extends Parameters<TypeSafeClient["systemOne"]>[0]["questions"]>(state: string, questions: Q) {
+    return jevBreaker.run(async () => {
+      await jevBucket.take();
+      return this.client.systemOne({ state, questions });
+    });
   }
 
   private meta(res: { model: string; usage: { input_tokens: number } }, start: number) {

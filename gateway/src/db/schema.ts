@@ -36,6 +36,12 @@ export const llmCalls = sqliteTable("llm_calls", {
     .notNull()
     .references(() => requests.id),
   createdAt: text("created_at").notNull(),
+  // Order within the request, starting at 1.
+  attempt: integer("attempt").notNull().default(1),
+  kind: text("kind", { enum: ["primary", "retry", "fallback", "escalation"] })
+    .notNull()
+    .default("primary"),
+  tier: text("tier", { enum: ["cheap", "strong"] }),
   provider: text("provider").notNull(),
   model: text("model").notNull(),
   inputTokens: integer("input_tokens").notNull(),
