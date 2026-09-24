@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { llmCalls, requests } from "./db/schema";
+import { llmCalls, requests, screenResults } from "./db/schema";
 import { handleChat } from "./pipeline";
 import { chatRequestSchema } from "./schemas";
 
@@ -26,8 +26,11 @@ app.get("/v1/requests/:id", async (c) => {
   const id = c.req.param("id");
   const [request] = await db.select().from(requests).where(eq(requests.id, id));
   if (!request) return c.json({ error: "not_found" }, 404);
-  const calls = await db.select().from(llmCalls).where(eq(llmCalls.requestId, id));
-  return c.json({ request, llm_calls: calls });
+  const [screens, calls] = await Promise.all([
+    db.select().from(screenResults).where(eq(screenResults.requestId, id)),
+    db.select().from(llmCalls).where(eq(llmCalls.requestId, id)),
+  ]);
+  return c.json({ request, screen_results: screens, llm_calls: calls });
 });
 
 export default app;

@@ -31,6 +31,15 @@
             <div id="samples"></div>
           </fieldset>
           <div class="row">
+            <label for="attack">Plant a test attack</label>
+            <select id="attack">
+              <option value="">None</option>
+              <option value="hidden">Hidden instruction</option>
+              <option value="exfil">Data exfiltration</option>
+              <option value="subtle">Subtle hint</option>
+            </select>
+          </div>
+          <div class="row">
             <label for="tier">Model</label>
             <select id="tier">
               <option value="">Gateway decides</option>
@@ -49,10 +58,9 @@
           <h2>Gateway report</h2>
           <dl id="report"></dl>
 
-          <details>
-            <summary>Chunks sent (<span id="chunk-count">0</span>)</summary>
-            <ol id="chunks"></ol>
-          </details>
+          <h2>Screening</h2>
+          <p id="screen-summary"></p>
+          <ol id="chunks"></ol>
         </div>
 
         <p id="error" role="alert" hidden></p>

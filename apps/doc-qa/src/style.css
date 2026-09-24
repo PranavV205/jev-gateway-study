@@ -6,6 +6,8 @@
   --border: #e7e5e4;
   --accent: #1d4ed8;
   --error: #b91c1c;
+  --ok: #15803d;
+  --warn: #b45309;
   color-scheme: light;
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
@@ -20,6 +22,8 @@
     --border: #44403c;
     --accent: #93c5fd;
     --error: #fca5a5;
+    --ok: #86efac;
+    --warn: #fcd34d;
     color-scheme: dark;
   }
 }
@@ -204,11 +208,63 @@ dd {
   overflow-wrap: anywhere;
 }
 
-#chunks li {
-  margin-bottom: 0.5rem;
-  color: var(--muted);
-}
-
 #error {
   color: var(--error);
+}
+
+#screen-summary {
+  margin: 0 0 0.5rem;
+}
+
+#chunks {
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+#chunks li {
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+}
+
+#chunks li.dropped {
+  border-color: var(--error);
+}
+
+#chunks pre {
+  margin: 0.5rem 0 0;
+  max-height: 12rem;
+}
+
+.chunk-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid currentColor;
+}
+
+.badge.kept {
+  color: var(--ok);
+}
+
+.badge.dropped {
+  color: var(--error);
+}
+
+.badge.planted {
+  color: var(--warn);
+}
+
+.scores {
+  color: var(--muted);
 }

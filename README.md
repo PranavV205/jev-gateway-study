@@ -6,8 +6,8 @@ Work in progress. So far:
 
 - `experiments/`: tests of Jev as an injection screen. See the READMEs in [`smoke`](experiments/smoke), [`hard-cases`](experiments/hard-cases), and [`question-wording`](experiments/question-wording).
 - `corpus/`: fictional business documents and questions for the demo app.
-- `gateway/`: a Cloudflare Worker (Hono, D1) with `POST /v1/chat`. It currently sends every request to the strong model and logs it. Screening and routing are not wired in yet.
-- `apps/doc-qa/`: a small demo page. Pick a document from the corpus, ask a question, and see the answer plus the gateway's report. It picks the most relevant chunks with BM25 and sends them to the gateway.
+- `gateway/`: a Cloudflare Worker (Hono, D1) with `POST /v1/chat`. It screens the user message and every chunk with Jev in parallel, refuses a prompt-injection attempt in the user message, drops chunks that look like planted instructions, then sends the rest to the strong model and logs every decision. Routing between a cheap and a strong model is not wired in yet.
+- `apps/doc-qa/`: a small demo page. Pick a document from the corpus, ask a question, and see the answer plus the gateway's report, including each chunk's screening scores. It can plant a harmless test attack in a chunk so you can watch the gateway drop it.
 
 ## Run locally
 
@@ -29,7 +29,7 @@ curl -X POST localhost:8000/v1/chat \
   -d '{"app_id": "demo", "user_message": "What is the total due?", "context_chunks": [{"id": "c1", "text": "Total due: $12,214.80"}]}'
 ```
 
-The response has the answer plus a `gateway` block with the model used, cost, and latency. `GET /v1/requests/:id` returns the logged record.
+The response has the answer plus a `gateway` block with the screening scores, dropped chunks, model used, cost, and latency. `GET /v1/requests/:id` returns the logged record, including one row per screened text. Set `"options": {"classifier": "none"}` to skip screening.
 
 ## Checks
 

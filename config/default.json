@@ -1,18 +1,37 @@
 {
   "version": "2026-09-24",
   "tiers": {
-    "cheap": { "provider": "groq", "model": "openai/gpt-oss-20b" },
-    "strong": { "provider": "groq", "model": "openai/gpt-oss-120b" }
+    "cheap": {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b"
+    },
+    "strong": {
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b"
+    }
   },
   "providers": {
-    "groq": { "baseUrl": "https://api.groq.com/openai/v1" },
-    "openrouter": { "baseUrl": "https://openrouter.ai/api/v1" }
+    "groq": {
+      "baseUrl": "https://api.groq.com/openai/v1"
+    },
+    "openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1"
+    }
   },
   "prices": {
     "_note": "USD per million tokens, published paid prices. Calls in this project run on free tiers.",
-    "openai/gpt-oss-20b": { "input": 0.075, "output": 0.3 },
-    "openai/gpt-oss-120b": { "input": 0.15, "output": 0.6 },
-    "jev-1.13.0": { "input": 0.042, "output": 0 }
+    "openai/gpt-oss-20b": {
+      "input": 0.075,
+      "output": 0.3
+    },
+    "openai/gpt-oss-120b": {
+      "input": 0.15,
+      "output": 0.6
+    },
+    "jev-1.13.0": {
+      "input": 0.042,
+      "output": 0
+    }
   },
   "llm": {
     "reasoningEffort": "low",
@@ -21,9 +40,15 @@
   },
   "jev": {
     "model": "jev-1.13.0",
-    "timeoutMs": 3000
+    "timeoutMs": 3000,
+    "maxRetries": 1
   },
   "screening": {
+    "_failPolicy": "What to do when a text could not be screened. user: 'allow' (flag it) or 'refuse'. chunk: 'drop' or 'keep'.",
+    "failPolicy": {
+      "user": "allow",
+      "chunk": "drop"
+    },
     "thresholds": {
       "userInjection": 0.3,
       "chunkInjection": 0.5,

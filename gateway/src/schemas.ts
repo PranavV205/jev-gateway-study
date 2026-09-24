@@ -18,8 +18,10 @@ export const chatRequestSchema = z.object({
     .object({
       force_tier: z.enum(["cheap", "strong"]).nullable().default(null),
       dry_run: z.boolean().default(false),
+      // "none" skips screening, for measuring the app without the gateway's protection.
+      classifier: z.enum(["jev", "none"]).default("jev"),
     })
-    .default({ force_tier: null, dry_run: false }),
+    .default({ force_tier: null, dry_run: false, classifier: "jev" }),
 });
 
 export type Chunk = z.infer<typeof chunkSchema>;

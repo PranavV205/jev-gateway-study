@@ -1,19 +1,34 @@
 import "./style.css";
+import { ATTACKS, isAttackId } from "./attacks";
 import { docs, questionsFor, type SampleQuestion } from "./corpus";
 import { type Chunk, chunkDocument, retrieve } from "./retrieve";
 
 const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL ?? "http://localhost:8000";
 const TOP_K = 5;
 
+interface ChunkScreen {
+  id: string;
+  p_injection: number | null;
+  p_exfil: number | null;
+  action: "kept" | "dropped";
+  reason: string | null;
+}
+
 interface GatewayReport {
   request_id: string;
-  action: string;
+  action: "allowed" | "refused" | "error";
   dropped_chunks: string[];
   tier: string | null;
   model: string | null;
+  screen: {
+    classifier: string;
+    flagged: boolean;
+    user: { p_injection: number | null; reason: string | null };
+    chunks: ChunkScreen[];
+  } | null;
   cost_usd: number;
   baseline_cost_usd: number;
-  latency_ms: { total: number; model: number };
+  latency_ms: { screen: number; model: number; total: number };
   error?: string;
 }
 
@@ -24,13 +39,14 @@ const docText = $<HTMLPreElement>("doc-text");
 const form = $<HTMLFormElement>("ask");
 const questionInput = $<HTMLTextAreaElement>("question");
 const samples = $<HTMLDivElement>("samples");
+const attackSelect = $<HTMLSelectElement>("attack");
 const tierSelect = $<HTMLSelectElement>("tier");
-const submit = form.querySelector("button") as HTMLButtonElement;
+const submit = form.querySelector('button[type="submit"]') as HTMLButtonElement;
 const result = $<HTMLDivElement>("result");
 const answerEl = $<HTMLParagraphElement>("answer");
 const expectedEl = $<HTMLParagraphElement>("expected");
 const reportEl = $<HTMLDListElement>("report");
-const chunkCount = $<HTMLSpanElement>("chunk-count");
+const screenSummary = $<HTMLParagraphElement>("screen-summary");
 const chunksEl = $<HTMLOListElement>("chunks");
 const errorEl = $<HTMLParagraphElement>("error");
 
@@ -62,51 +78,96 @@ function selectDoc(id: string) {
   result.hidden = true;
 }
 
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, className?: string) {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  if (className) node.className = className;
+  return node;
+}
+
 function row(label: string, value: string) {
-  const dt = document.createElement("dt");
-  dt.textContent = label;
-  const dd = document.createElement("dd");
-  dd.textContent = value;
-  return [dt, dd];
+  return [el("dt", label), el("dd", value)];
 }
 
 const usd = (n: number) => `$${n.toFixed(6)}`;
+const score = (p: number | null) => (p === null ? "not screened" : p.toFixed(2));
 
 // gpt-oss often uses narrow no-break spaces and non-breaking hyphens, which some fonts
 // render with no visible gap, and sometimes adds Markdown bold despite the prompt.
 // Answers are shown as plain text, so normalize those before display.
 const plain = (s: string) =>
   s
-    .replace(/[\u00a0\u202f\u2007]/g, " ")
-    .replace(/[\u2010\u2011]/g, "-")
+    .replace(/[   ]/g, " ")
+    .replace(/[‐‑]/g, "-")
     .replace(/\*\*(.+?)\*\*/g, "$1");
 
-function render(answer: string | null, report: GatewayReport, sent: Chunk[]) {
-  answerEl.textContent = answer ? plain(answer) : "(no answer)";
+// Appends the chosen test attack to the first chunk, so it always reaches the gateway.
+function withAttack(sent: Chunk[], attackId: string): { chunks: Chunk[]; plantedIn: string | null } {
+  const first = sent[0];
+  if (!first || !isAttackId(attackId)) return { chunks: sent, plantedIn: null };
+  return {
+    chunks: [{ ...first, text: `${first.text}\n\n${ATTACKS[attackId]}` }, ...sent.slice(1)],
+    plantedIn: first.id,
+  };
+}
+
+function renderScreen(report: GatewayReport, sent: Chunk[], plantedIn: string | null) {
+  const s = report.screen;
+  if (!s) {
+    screenSummary.textContent = "Screening was skipped.";
+  } else if (report.action === "refused") {
+    screenSummary.textContent = `Refused: the question scored ${score(s.user.p_injection)} as a prompt-injection attempt.`;
+  } else {
+    const dropped = s.chunks.filter((c) => c.action === "dropped").length;
+    screenSummary.textContent =
+      `Question scored ${score(s.user.p_injection)}${s.flagged ? " (could not be screened, allowed and flagged)" : ""}. ` +
+      `${s.chunks.length - dropped} of ${s.chunks.length} chunks kept, ${dropped} dropped.`;
+  }
+
+  const byId = new Map(s?.chunks.map((c) => [c.id, c]));
+  chunksEl.replaceChildren(
+    ...sent.map((c) => {
+      const verdict = byId.get(c.id);
+      const li = el("li", undefined, verdict?.action === "dropped" ? "dropped" : "");
+      const head = el("div", undefined, "chunk-head");
+      head.append(el("strong", c.id));
+      if (verdict) {
+        head.append(
+          el("span", verdict.action === "dropped" ? `dropped (${verdict.reason})` : "kept", `badge ${verdict.action}`),
+          el("span", `injection ${score(verdict.p_injection)}, exfiltration ${score(verdict.p_exfil)}`, "scores"),
+        );
+      }
+      if (c.id === plantedIn) head.append(el("span", "test attack planted here", "badge planted"));
+      li.append(head, el("pre", c.text));
+      return li;
+    }),
+  );
+}
+
+function render(answer: string | null, report: GatewayReport, sent: Chunk[], plantedIn: string | null) {
+  answerEl.textContent =
+    report.action === "refused"
+      ? "The gateway refused this question, so no model was called."
+      : answer
+        ? plain(answer)
+        : "(no answer)";
   const expected = activeSample?.question === questionInput.value.trim() ? activeSample : null;
   expectedEl.hidden = !expected;
   if (expected) expectedEl.textContent = `Reference answer: ${expected.answer}`;
 
   reportEl.replaceChildren(
     ...row("Action", report.action),
-    ...row("Model", `${report.model ?? "none"} (${report.tier ?? "no"} tier)`),
+    ...row("Model", report.model ? `${report.model} (${report.tier} tier)` : "none called"),
     ...row("Cost", `${usd(report.cost_usd)} (all-strong baseline ${usd(report.baseline_cost_usd)})`),
-    ...row("Latency", `${report.latency_ms.total} ms total, ${report.latency_ms.model} ms in the model`),
-    ...row("Dropped chunks", report.dropped_chunks.length ? report.dropped_chunks.join(", ") : "none"),
+    ...row(
+      "Latency",
+      `${report.latency_ms.total} ms total: ${report.latency_ms.screen} ms screening, ${report.latency_ms.model} ms model`,
+    ),
     ...row("Request ID", report.request_id),
     ...(report.error ? row("Error", report.error) : []),
   );
 
-  chunkCount.textContent = String(sent.length);
-  chunksEl.replaceChildren(
-    ...sent.map((c) => {
-      const li = document.createElement("li");
-      const pre = document.createElement("pre");
-      pre.textContent = c.text;
-      li.append(c.id, pre);
-      return li;
-    }),
-  );
+  renderScreen(report, sent, plantedIn);
   result.hidden = false;
 }
 
@@ -115,7 +176,7 @@ async function ask(event: SubmitEvent) {
   const question = questionInput.value.trim();
   if (!question) return;
 
-  const sent = retrieve(question, chunks, TOP_K);
+  const { chunks: sent, plantedIn } = withAttack(retrieve(question, chunks, TOP_K), attackSelect.value);
   errorEl.hidden = true;
   submit.disabled = true;
   submit.textContent = "Asking...";
@@ -133,7 +194,7 @@ async function ask(event: SubmitEvent) {
     });
     const body = await res.json();
     if (!body.gateway) throw new Error(`Gateway returned ${res.status}: ${JSON.stringify(body)}`);
-    render(body.answer, body.gateway, sent);
+    render(body.answer, body.gateway, sent, plantedIn);
   } catch (err) {
     errorEl.textContent = `Request failed: ${err instanceof Error ? err.message : String(err)}. Is the gateway running at ${GATEWAY_URL}?`;
     errorEl.hidden = false;
