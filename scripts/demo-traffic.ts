@@ -2,7 +2,8 @@
 // Every corpus question is asked the way doc-qa asks it (same chunking and ranking),
 // a test attack is planted in every fourth request, and a few attack questions are added.
 //
-// Usage: npm run demo:traffic [-- --gateway http://localhost:8000 --concurrency 2]
+// Usage: npm run demo:traffic [-- --gateway http://localhost:8000 --concurrency 2 --per-minute 8]
+// Use --per-minute against a deployed gateway, which rate limits each IP.
 
 import { readFileSync } from "node:fs";
 import { ATTACKS } from "../apps/doc-qa/src/attacks.ts";
@@ -14,6 +15,8 @@ const arg = (name: string, fallback: string) => {
 };
 const GATEWAY = arg("gateway", "http://localhost:8000");
 const CONCURRENCY = Number(arg("concurrency", "2"));
+// 0 means no pacing.
+const PER_MINUTE = Number(arg("per-minute", "0"));
 
 interface Question {
   id: string;
@@ -77,10 +80,24 @@ async function send(job: (typeof jobs)[number]) {
   );
 }
 
+// Spaces request starts evenly across all workers when --per-minute is set.
+let nextStart = Date.now();
+async function waitTurn() {
+  if (!PER_MINUTE) return;
+  const at = nextStart;
+  nextStart = Math.max(nextStart, Date.now()) + 60_000 / PER_MINUTE;
+  const wait = at - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
+
 let next = 0;
 await Promise.all(
   Array.from({ length: CONCURRENCY }, async () => {
-    while (next < jobs.length) await send(jobs[next++] as (typeof jobs)[number]);
+    while (next < jobs.length) {
+      const job = jobs[next++] as (typeof jobs)[number];
+      await waitTurn();
+      await send(job);
+    }
   }),
 );
 console.log(`Sent ${jobs.length} requests to ${GATEWAY}.`);
