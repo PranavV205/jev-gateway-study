@@ -6,7 +6,8 @@ A small gateway that sits between an LLM app and its model providers, used to te
 
 Work in progress. So far:
 
-- `experiments/`: tests of Jev as an injection screen. See the READMEs in [`smoke`](experiments/smoke), [`hard-cases`](experiments/hard-cases), and [`question-wording`](experiments/question-wording).
+- `eval/`: a frozen, head-to-head benchmark of Jev and the open decision models (Kev, Laya, GLiNER2.5-Decide) plus Prompt Guard 2, ProtectAI, and a keyword filter, on in-document attacks, user jailbreaks, obfuscation, false alarms, and adaptive attacks. Results in [`eval/README.md`](eval/README.md).
+- `experiments/`: early tests of Jev as an injection screen. See the READMEs in [`smoke`](experiments/smoke), [`hard-cases`](experiments/hard-cases), and [`question-wording`](experiments/question-wording).
 - `corpus/`: fictional business documents and questions for the demo app.
 - `gateway/`: a Cloudflare Worker (Hono, D1) with `POST /v1/chat`. It screens the user message and every chunk with Jev in parallel, refuses a prompt-injection attempt in the user message, drops chunks that look like planted instructions, and asks Jev what kind of task the question is. Clear lookups and extractions go to the cheap model, everything else to the strong one. Every screening and routing decision is logged. If Groq fails it retries with backoff, then falls back to a list of free OpenRouter models, and if the cheap tier fails entirely it escalates to the strong tier. Jev calls go through a rate limiter and a circuit breaker.
 - `apps/dashboard/`: a one-page dashboard over the gateway's logs: cost with the gateway vs. always using the strong model, routing by task type, threats caught, Jev score distributions, latency, retries and fallbacks, and recent borderline cases. It reads `GET /v1/stats`.

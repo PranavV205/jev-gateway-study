@@ -1,0 +1,127 @@
+{
+  "seed": 20260925,
+  "cases": 1242,
+  "sha256": "6255125824bbed51cce5e56d9660e8799eed14e557517ff44e7713dd1a520529",
+  "sources": {
+    "notinject": "leolee99/NotInject (MIT)",
+    "deepset": "deepset/prompt-injections test split (Apache 2.0)",
+    "filler": "Wikipedia 'Bicycle' via experiments/hard-cases (CC BY-SA 4.0)",
+    "corpus": "corpus/documents (fictional, this repo)"
+  },
+  "dev_documents": [
+    "invoice-cedarpine-0913",
+    "invoice-northwind-2041",
+    "lease-alder-street",
+    "policy-employee-handbook"
+  ],
+  "groups": {
+    "hand_hard_negative": {
+      "dev": 31,
+      "test": 0,
+      "attacks": 0,
+      "benign": 31
+    },
+    "hand_sneaky_attack": {
+      "dev": 30,
+      "test": 0,
+      "attacks": 30,
+      "benign": 0
+    },
+    "hand_targets_jev": {
+      "dev": 10,
+      "test": 0,
+      "attacks": 10,
+      "benign": 0
+    },
+    "hand_length": {
+      "dev": 16,
+      "test": 0,
+      "attacks": 12,
+      "benign": 4
+    },
+    "hand_user_request": {
+      "dev": 20,
+      "test": 0,
+      "attacks": 0,
+      "benign": 20
+    },
+    "hand_user_attack": {
+      "dev": 10,
+      "test": 0,
+      "attacks": 10,
+      "benign": 0
+    },
+    "clean_chunk": {
+      "dev": 22,
+      "test": 29,
+      "attacks": 0,
+      "benign": 51
+    },
+    "embedded_attack": {
+      "dev": 22,
+      "test": 29,
+      "attacks": 51,
+      "benign": 0
+    },
+    "benign_lookalike": {
+      "dev": 66,
+      "test": 87,
+      "attacks": 0,
+      "benign": 153
+    },
+    "grid_attack": {
+      "dev": 0,
+      "test": 90,
+      "attacks": 90,
+      "benign": 0
+    },
+    "obfuscated": {
+      "dev": 0,
+      "test": 96,
+      "attacks": 96,
+      "benign": 0
+    },
+    "paraphrase": {
+      "dev": 0,
+      "test": 54,
+      "attacks": 54,
+      "benign": 0
+    },
+    "bait": {
+      "dev": 0,
+      "test": 36,
+      "attacks": 36,
+      "benign": 0
+    },
+    "length": {
+      "dev": 0,
+      "test": 28,
+      "attacks": 24,
+      "benign": 4
+    },
+    "notinject": {
+      "dev": 113,
+      "test": 226,
+      "attacks": 0,
+      "benign": 339
+    },
+    "deepset": {
+      "dev": 0,
+      "test": 116,
+      "attacks": 60,
+      "benign": 56
+    },
+    "subtle_attack": {
+      "dev": 22,
+      "test": 29,
+      "attacks": 51,
+      "benign": 0
+    },
+    "obfuscated_benign": {
+      "dev": 0,
+      "test": 60,
+      "attacks": 0,
+      "benign": 60
+    }
+  }
+}

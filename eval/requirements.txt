@@ -1,0 +1,9 @@
+# Detector benchmark. Python 3.12.
+httpx==0.28.1
+numpy>=2.1
+scikit-learn>=1.5
+torch>=2.6
+transformers>=4.51
+laya==0.3.20
+gliner2==2.0.0
+peft>=0.15
