@@ -8,7 +8,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "types": "wrangler types"
+    "types": "wrangler types --strict-vars=false"
   },
   "dependencies": {
     "@typesafe-ai/sdk": "0.6.0",

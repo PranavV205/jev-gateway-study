@@ -227,6 +227,11 @@ async function ask(event: SubmitEvent) {
       }),
     });
     const body = await res.json();
+    if (res.status === 429 && body.message) {
+      errorEl.textContent = body.message;
+      errorEl.hidden = false;
+      return;
+    }
     if (!body.gateway) throw new Error(`Gateway returned ${res.status}: ${JSON.stringify(body)}`);
     render(body.answer, body.gateway, sent, plantedIn);
   } catch (err) {

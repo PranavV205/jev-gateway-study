@@ -4,16 +4,17 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { llmCalls, requests, routeDecisions, screenResults } from "./db/schema";
 import { handleChat } from "./pipeline";
+import { allowedOrigin, chatGuard } from "./protect";
 import { chatRequestSchema } from "./schemas";
 import { listApps, loadStats, type Range } from "./stats";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("/v1/*", cors());
+app.use("/v1/*", cors({ origin: (origin, c) => allowedOrigin(origin, c.env) }));
 
 app.get("/healthz", (c) => c.json({ ok: true }));
 
-app.post("/v1/chat", async (c) => {
+app.post("/v1/chat", chatGuard, async (c) => {
   const parsed = chatRequestSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json({ error: "invalid_request", issues: parsed.error.issues }, 400);

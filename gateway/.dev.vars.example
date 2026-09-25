@@ -2,3 +2,6 @@
 TYPESAFE_API_KEY=
 GROQ_API_KEY=
 OPENROUTER_API_KEY=
+
+# Browser origins allowed locally (overrides the deployed list in wrangler.toml).
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174

@@ -6,11 +6,25 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "jev-gateway-study"
-database_id = "local-only"
+database_id = "c9d8fc16-bb84-4396-b38f-5f0486633a5d"
 migrations_dir = "migrations"
 
 [observability]
 enabled = true
+
+# Protection for the public demo. Override in the Cloudflare dashboard or with --var.
+[vars]
+# Browser origins allowed to call the API, comma-separated. "*" allows any.
+# Local development overrides this in .dev.vars.
+ALLOWED_ORIGINS = "https://jev-gateway-doc-qa.work-pranavv.workers.dev,https://jev-gateway-dashboard.work-pranavv.workers.dev"
+# Chat requests allowed per UTC day across all visitors.
+DAILY_REQUEST_CAP = "300"
+
+# Chat requests per visitor IP: 10 per 60 seconds.
+[[ratelimits]]
+name = "CHAT_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
 
 [dev]
 port = 8000

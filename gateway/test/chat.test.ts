@@ -2,6 +2,7 @@ import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { jevBreaker } from "../src/classifiers/jev";
 import app from "../src/index";
+import { requestsToday } from "../src/protect";
 
 const groqReply = {
   choices: [{ message: { content: "The total due is $12,214.80." } }],
@@ -74,15 +75,24 @@ function mockNetwork(opts: NetOpts = {}) {
   return { spy, jevCalls, groqCalls, openrouterCalls };
 }
 
-async function call(method: string, path: string, body?: unknown) {
+// Tests send many chat requests from one "IP", so the per-visitor limiter always allows
+// unless a test overrides it.
+const allowAll = { limit: async () => ({ success: true }) } as unknown as RateLimit;
+
+async function call(
+  method: string,
+  path: string,
+  body?: unknown,
+  opts: { env?: Partial<Env>; headers?: Record<string, string> } = {},
+) {
   const ctx = createExecutionContext();
   const res = await app.fetch(
     new Request(`http://gateway.test${path}`, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...opts.headers },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
-    env,
+    { ...env, CHAT_LIMITER: allowAll, ...opts.env },
     ctx,
   );
   await waitOnExecutionContext(ctx);
@@ -139,6 +149,41 @@ describe("GET /healthz", () => {
   it("returns ok", async () => {
     const res = await call("GET", "/healthz");
     expect(await res.json()).toEqual({ ok: true });
+  });
+});
+
+describe("public demo protection", () => {
+  it("returns 429 when a visitor is over the rate limit", async () => {
+    const net = mockNetwork();
+    const deny = { limit: async () => ({ success: false }) } as unknown as RateLimit;
+    const res = await call("POST", "/v1/chat", request(), { env: { CHAT_LIMITER: deny } });
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    expect(await res.json()).toMatchObject({ error: "rate_limited" });
+    expect(net.jevCalls).toHaveLength(0);
+  });
+
+  it("stops chat requests once the daily cap is reached", async () => {
+    mockNetwork();
+    const cap = String((await requestsToday(env.DB)) + 1);
+    const first = await call("POST", "/v1/chat", request(), { env: { DAILY_REQUEST_CAP: cap } });
+    expect(first.status).toBe(200);
+    const second = await call("POST", "/v1/chat", request(), { env: { DAILY_REQUEST_CAP: cap } });
+    expect(second.status).toBe(429);
+    expect(await second.json()).toMatchObject({ error: "daily_limit" });
+  });
+
+  it("only allows configured browser origins", async () => {
+    const ok = await call("GET", "/healthz", undefined, { headers: { Origin: "http://localhost:5173" } });
+    expect(ok.headers.get("Access-Control-Allow-Origin")).toBeNull();
+
+    const allowed = await call("GET", "/v1/stats?range=all", undefined, {
+      headers: { Origin: "http://localhost:5173" },
+    });
+    expect(allowed.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:5173");
+
+    const other = await call("GET", "/v1/stats?range=all", undefined, { headers: { Origin: "https://evil.example" } });
+    expect(other.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 });
 

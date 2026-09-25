@@ -14,6 +14,7 @@ export default defineConfig(async () => {
           bindings: {
             TEST_MIGRATIONS: migrations,
             RUN_LIVE: live ? "1" : "0",
+            ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:5174",
             GROQ_API_KEY: live ? (process.env.GROQ_API_KEY ?? "") : "test-groq-key",
             TYPESAFE_API_KEY: live ? (process.env.TYPESAFE_API_KEY ?? "") : "test-typesafe-key",
             OPENROUTER_API_KEY: live ? (process.env.OPENROUTER_API_KEY ?? "") : "test-openrouter-key",

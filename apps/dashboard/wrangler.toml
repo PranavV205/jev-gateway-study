@@ -1,0 +1,6 @@
+# Serves the built page as static files on Cloudflare Workers.
+name = "jev-gateway-dashboard"
+compatibility_date = "2026-08-15"
+
+[assets]
+directory = "./dist"
