@@ -272,6 +272,13 @@ class PromptGuard(Detector):
             if r.status_code == 429:
                 await asyncio.sleep(float(r.headers.get("retry-after", 5)))
                 continue
+            if r.status_code == 400 and len(text.split()) > 20:
+                # Over the model's 512-token window: score each half, keep the higher.
+                words = text.split()
+                mid = len(words) // 2
+                halves = [await self._one(" ".join(words[:mid])), await self._one(" ".join(words[mid:]))]
+                best = max(halves, key=lambda h: h[0])
+                return best[0], {"split": [h[1] for h in halves]}
             r.raise_for_status()
             data = r.json()
             return float(data["choices"][0]["message"]["content"]), data

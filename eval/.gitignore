@@ -1,0 +1,3 @@
+# Downloaded source datasets for the fresh test set; rebuilt by bench.fresh
+.cache/
+data/fresh.jsonl

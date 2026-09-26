@@ -1,0 +1,16 @@
+{
+  "seed": 20260926,
+  "cases": 620,
+  "sha256_of_fresh_jsonl": "b1298ad48f8e1a3bed28b17f2c24b81f3f2e941cd99c147416e92ad520d54813",
+  "groups": {
+    "llmail_evaded_ms": 91,
+    "llmail_caught_by_ms": 129,
+    "enron_benign": 400
+  },
+  "teams": 48,
+  "sources": {
+    "attacks": "microsoft/llmail-inject-challenge, Phase2, exfil.sent = true (MIT)",
+    "benign": "LLM-PBE/enron-email, shard 0 (Apache 2.0)"
+  },
+  "rules": "at most 4 attacks per team, near-duplicates removed, 10-800 word attacks, 30-600 word emails"
+}

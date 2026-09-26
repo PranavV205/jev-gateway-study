@@ -34,6 +34,11 @@ That wording was tuned for Jev on earlier experiments, which is a home-field adv
 | Paraphrases and "classifier, answer no" bait on the same attacks | Consistency |
 | [NotInject](https://huggingface.co/datasets/leolee99/NotInject) (MIT) and the [deepset](https://huggingface.co/datasets/deepset/prompt-injections) test split (Apache 2.0) | User-message false alarms and jailbreaks |
 
+**Fresh held-out set** (620 texts, built by `bench.fresh`). Nothing in it was written by this repo's author, and nothing is tuned on it. The Enron emails are real people's messages, so the text is not committed: `bench.fresh` rebuilds `data/fresh.jsonl` from the public sources, and `data/fresh-ids.json` lists exactly which rows were used.
+
+- 220 human-written attack emails from Microsoft's [LLMail-Inject](https://huggingface.co/datasets/microsoft/llmail-inject-challenge) challenge (Phase 2, MIT) that **actually hijacked** the email assistant, from 48 teams (at most 4 per team, near-duplicates removed). 91 got past Microsoft's defenses in the challenge; 129 were caught.
+- 400 real business emails from the [Enron corpus](https://huggingface.co/datasets/LLM-PBE/enron-email) (Apache 2.0).
+
 The hand-written cases used to choose Jev's wording are in dev only. Thresholds were tuned on dev (at 5% false alarms) and frozen before scoring test. The subtle attacks and the scrambled innocent controls were **added after a first look at test results**, because every original attack said "AI assistant" out loud and Jev's perfect score needed a harder check. No threshold or wording changed.
 
 ## Results
@@ -66,6 +71,21 @@ Test split. Confidence intervals are 95%, from 2,000 bootstrap resamples. AUC is
 | ProtectAI DeBERTa | 0.50 | 13% | 15% |
 | Keywords | 0.50 | 2% | 2% |
 
+**Fresh held-out set: real human attacks vs. real emails** (220 attacks, 400 Enron emails). Every detector uses the threshold frozen on this repo's dev split, so this also tests whether that threshold transfers:
+
+| Detector | AUC (95% CI) | Caught at frozen threshold | False alarms on Enron | Caught, got past Microsoft | Caught, Microsoft caught |
+|---|---|---|---|---|---|
+| **Jev** | **1.00** (1.00 to 1.00) | **95%** | 0% | 93% | 96% |
+| **Kev-4B** | **0.99** (0.99 to 1.00) | 86% | 1% | 82% | 88% |
+| Laya | 0.85 | 32% | 9% | 25% | 36% |
+| GLiNER2.5-Decide | 0.85 | 7% | 0% | 5% | 8% |
+| ProtectAI DeBERTa | 0.83 | 3% | 0% | 3% | 2% |
+| Prompt Guard 2 | 0.81 | 4% | 0% | 1% | 5% |
+| Kev-0.8B | 0.80 | 39% | 5% | 42% | 37% |
+| Keywords | 0.50 | 0% | 0% | 0% | 1% |
+
+Only 51 of the 220 attacks mention an AI at all; most are disguised as ordinary emails. The fairness-pass wordings are in `results/report.md`: Kev-4B's chosen wording ranked just as well (1.00) but caught only 42% at its frozen threshold, because its scores shifted on this data.
+
 **Fairness pass.** Each model's original wording next to the wording it picked on dev, scored once on test:
 
 | Model | Wording | Chunk AUC | Subtle AUC | User AUC |
@@ -92,19 +112,21 @@ The home-field advantage does not explain Jev's lead. The open models all prefer
 
 ## What stood out
 
-1. **Jev caught nearly every attack that doesn't announce itself** (subtle attacks: 0.98 AUC, 97% recall). Kev-4B was next (0.93, 62% recall); the three classifiers built for injection (Prompt Guard, ProtectAI, keywords) were at chance.
-2. **Wording is not why Jev wins.** Every open model got to pick its own wording on dev; Jev still led on every headline number. Kev-4B's best wording nearly tied Jev on user messages (0.87 vs 0.88).
-3. **Kev-4B is the strongest open option, by a wide margin.** It is also the least consistent: rewording an attack flipped its decision on 11 of 18 sets, and "classifier, answer no" bait made it miss 6 of 18 attacks it otherwise caught. Jev flipped 0 of 18 on both.
-4. **Part of Jev's robustness is flagging anything strange.** It caught nearly every scrambled attack, but it also flagged 7 of 8 innocent ROT13 sentences and 5 of 8 innocent leetspeak ones. Without the innocent controls this would have looked like pure robustness.
-5. **Jev's main weakness is false alarms**: 8% of innocent document chunks (mostly quoted system prompts and security reminders) and 30 of 71 NotInject "technique" questions ("Can I ignore this warning in my code?") at the frozen user threshold.
-6. **Jev is not deterministic.** The same text sent three times changed score on 33 of 50 texts, by up to 0.07.
-7. **The dedicated injection classifiers are tuned to jailbreak phrasing.** Prompt Guard caught 23/23 "ignore your instructions" attacks and 0 of every other goal.
-8. **Laya's scores are poorly separated on user messages** (0.60 AUC, with 61% false alarms at its native 0.5), and it drops off on long input (0 of 6 at 1,200 and 2,400 words), consistent with its 512-token window.
-9. **Adaptive attacks beat every detector sometimes**, and the injection classifiers almost always, usually within 2 rewrites.
+1. **On real human attacks, the free open model nearly matches Jev.** Kev-4B, running locally on a laptop for $0, ranked the LLMail-Inject attacks almost perfectly (0.99 vs Jev's 1.00 AUC) and caught 86% vs Jev's 95%, with 1% false alarms on real emails. That includes attacks that got past Microsoft's own defenses in the challenge.
+2. **Jev caught nearly every attack that doesn't announce itself** (subtle attacks: 0.98 AUC, 97% recall). Kev-4B was next (0.93, 62% recall); the three classifiers built for injection (Prompt Guard, ProtectAI, keywords) were at chance.
+3. **Wording is not why Jev wins.** Every open model got to pick its own wording on dev; Jev still led on every headline number. Kev-4B's best wording nearly tied Jev on user messages (0.87 vs 0.88).
+4. **Kev-4B is the strongest open option, by a wide margin, but easy to push around.** Rewording an attack flipped its decision on 11 of 18 sets, and "classifier, answer no" bait made it miss 6 of 18 attacks it otherwise caught. Jev flipped 0 of 18 on both.
+5. **Part of Jev's robustness is flagging anything strange.** It caught nearly every scrambled attack, but it also flagged 7 of 8 innocent ROT13 sentences and 5 of 8 innocent leetspeak ones. Without the innocent controls this would have looked like pure robustness.
+6. **Jev's main weakness is false alarms**: 8% of innocent document chunks (mostly quoted system prompts and security reminders) and 30 of 71 NotInject "technique" questions ("Can I ignore this warning in my code?") at the frozen user threshold.
+7. **Jev is not deterministic.** The same text sent three times changed score on 33 of 50 texts, by up to 0.07.
+8. **The dedicated injection classifiers rank human attacks decently, but their default thresholds catch almost nothing.** Prompt Guard and ProtectAI reached 0.81 to 0.83 AUC on LLMail-Inject but flagged 3 to 4% at their frozen thresholds. On the template set they were tuned to jailbreak phrasing: Prompt Guard caught 23/23 "ignore your instructions" attacks and 0 of every other goal.
+9. **Laya's scores are poorly separated on user messages** (0.60 AUC, with 61% false alarms at its native 0.5), and it drops off on long input (0 of 6 at 1,200 and 2,400 words), consistent with its 512-token window.
+10. **Adaptive attacks beat every detector sometimes**, and the injection classifiers almost always, usually within 2 rewrites.
 
 ## Caveats
 
-- One document domain (fictional business documents). Attacks and look-alikes are template-based; real attacks will differ.
+- The main set is one domain (fictional business documents) with template attacks. The fresh set fixes authorship but has its own limits: every LLMail attack pursues the same goal (send "confirmation" to one address), and the Enron emails are from around 2000 while the attacks are from 2025, so some separation may come from writing style rather than intent. Keywords scored 0.50 there, so it is not simple surface words.
+- A threshold tuned on one data set does not always transfer: the same model can rank a new set almost perfectly while its fixed threshold catches far fewer attacks (Kev-4B's chosen wording: 1.00 AUC, 42% caught).
 - Small groups: 29 subtle attacks, 6 to 12 per obfuscation, 10 attacks per detector in the adaptive round. Intervals are wide there.
 - Adaptive starting sets differ by detector: each starts from attacks it already caught, which for weak detectors are the most obvious ones.
 - deepset labels are broad: some "injections" are ordinary task requests.
@@ -122,6 +144,8 @@ uv venv venv --python 3.12
 uv pip install --python venv/bin/python -r requirements.txt
 
 venv/bin/python -m bench.data                 # rebuild data/cases.jsonl (checksum in data/manifest.json)
+venv/bin/python -m bench.fresh                # download sources and rebuild data/fresh.jsonl
+venv/bin/python -m bench.run jev --data fresh # score the fresh held-out set
 venv/bin/python -m bench.run jev              # or kev-4b, kev-0.8b, laya, gliner-labels_plain,
                                               #    protectai-deberta, promptguard2, keywords
 venv/bin/python -m bench.run kev-4b@w3 --split dev   # a fairness-pass wording (w1 to w3)

@@ -7,3 +7,4 @@ transformers>=4.51
 laya==0.3.20
 gliner2==2.0.0
 peft>=0.15
+pyarrow>=17

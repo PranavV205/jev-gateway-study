@@ -242,6 +242,66 @@ def fairness_section(cases):
     return {"chosen": chosen, "chunk": chunk, "subtle": subtle, "user": user}, md
 
 
+FRESH_DETECTORS = DETECTORS[:1] + ["kev-4b", "kev-4b@w3", "kev-0.8b", "kev-0.8b@w3", "laya", "laya@w3"] + DETECTORS[4:]
+
+
+def fresh_section(cases):
+    """Held-out human attacks (LLMail-Inject) vs. Enron emails, at each detector's chunk
+    threshold frozen on this repo's dev split. Nothing is tuned on this set."""
+    fresh_path = EVAL / "data" / "fresh.jsonl"
+    if not fresh_path.exists():
+        return None, "Not built yet."
+    fresh = {c["id"]: c for c in map(json.loads, fresh_path.read_text().splitlines())}
+    _, dev_scores = load(FRESH_DETECTORS)
+    out, rows = {}, []
+    for det in FRESH_DETECTORS:
+        path = RESULTS / "raw" / "fresh" / f"{det}.jsonl"
+        if not path.exists() or det not in dev_scores:
+            continue
+        scored = [r for r in map(json.loads, path.read_text().splitlines()) if "error" not in r and r["repeat"] == 0]
+        if len(scored) < len(fresh):
+            continue  # still running
+        ydev, pdev = yp(select(cases, dev_scores[det], "dev", "chunk"))
+        t = m.threshold_at_fpr(ydev, pdev, TUNED_FPR)
+        pairs = [(fresh[r["id"]], r) for r in scored]
+        y, p = yp(pairs)
+
+        def recall(group):
+            hits = [r["p"] >= t for c, r in pairs if c["group"] == group]
+            return sum(hits) / len(hits) if hits else None
+
+        rates = m.rates(y, p, t)
+        out[det] = {
+            "auc": m.auc(y, p),
+            "auc_ci": m.bootstrap(m.auc, y, p, n=2000),
+            "threshold": t,
+            "recall": rates["recall"],
+            "recall_evaded_ms": recall("llmail_evaded_ms"),
+            "recall_caught_by_ms": recall("llmail_caught_by_ms"),
+            "fpr_enron": rates["fpr"],
+            "recall_at_5pct_fpr": m.rates(y, p, m.threshold_at_fpr(y, p, 0.05))["recall"],
+            "n_pos": rates["n_pos"],
+            "n_neg": rates["n_neg"],
+        }
+        o = out[det]
+        rows.append(
+            [
+                det,
+                f"{fmt(o['auc'], False)} ({ci(o['auc_ci'], False)})",
+                fmt(o["recall_at_5pct_fpr"]),
+                f"{fmt(o['recall'])} / {fmt(o['fpr_enron'])}",
+                fmt(o["recall_evaded_ms"]),
+                fmt(o["recall_caught_by_ms"]),
+            ]
+        )
+    md = table(
+        ["Detector", "AUC (95% CI)", "Recall @5% FPR (oracle threshold)", "Frozen threshold: recall / Enron FPR",
+         "Recall: got past Microsoft", "Recall: Microsoft caught"],
+        rows,
+    )
+    return out, md
+
+
 def consistency(cases, scores, thresholds):
     out = {}
     for det, by_id in scores.items():
@@ -317,6 +377,7 @@ def main():
     cons = consistency(cases, scores, t_chunk)
     obf_pairs = obfuscation_pairs(cases, scores, t_chunk)
     fairness, fairness_md = fairness_section(cases)
+    fresh, fresh_md = fresh_section(cases)
     adaptive = adaptive_summary()
     speed = speed_cost(scores)
 
@@ -326,6 +387,7 @@ def main():
         "obfuscation_pairs": obf_pairs,
         "adaptive": adaptive,
         "fairness": fairness,
+        "fresh": fresh,
         "user": user,
         "user_deepset_vs_notinject": notinject_only,
         "breakdowns": {
@@ -393,6 +455,17 @@ def main():
         "AUC; ties keep w0), then the choice was scored once on test. Wordings are in `bench/detectors.py`.",
         "",
         fairness_md,
+        "",
+        "## Fresh held-out set: human attacks vs. real emails",
+        "",
+        "Not written by this repo's author and not tuned on. Attacks: human-written emails from Microsoft's "
+        "LLMail-Inject challenge (Phase 2) that actually hijacked the email assistant, at most 4 per team. "
+        "Benign: real Enron business emails. Thresholds are each detector's chunk threshold frozen on this "
+        "repo's dev split, so the middle column also tests whether that threshold transfers. The "
+        "\"@5% FPR\" column picks the threshold on this set itself, for ranking only. "
+        "Details in `data/fresh-manifest.json`.",
+        "",
+        fresh_md,
         "",
         "## Subtle attacks (never mention an AI)",
         "",

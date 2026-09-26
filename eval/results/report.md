@@ -31,6 +31,24 @@ The frozen wording (w0) was tuned for Jev on earlier experiments. Here every que
 | laya | w0 (frozen) | 0.82 | 21% / 1% | 0.78 | 21% | 0.60 | 20% / 15% |
 | laya | w3 (chosen on dev) | 0.91 | 19% / 1% | 0.85 | 17% | 0.56 | 18% / 7% |
 
+## Fresh held-out set: human attacks vs. real emails
+
+Not written by this repo's author and not tuned on. Attacks: human-written emails from Microsoft's LLMail-Inject challenge (Phase 2) that actually hijacked the email assistant, at most 4 per team. Benign: real Enron business emails. Thresholds are each detector's chunk threshold frozen on this repo's dev split, so the middle column also tests whether that threshold transfers. The "@5% FPR" column picks the threshold on this set itself, for ranking only. Details in `data/fresh-manifest.json`.
+
+| Detector | AUC (95% CI) | Recall @5% FPR (oracle threshold) | Frozen threshold: recall / Enron FPR | Recall: got past Microsoft | Recall: Microsoft caught |
+|---|---|---|---|---|---|
+| jev | 1.00 (1.00 to 1.00) | 100% | 95% / 0% | 93% | 96% |
+| kev-4b | 0.99 (0.99 to 1.00) | 99% | 86% / 1% | 82% | 88% |
+| kev-4b@w3 | 1.00 (0.99 to 1.00) | 99% | 42% / 0% | 36% | 46% |
+| kev-0.8b | 0.80 (0.77 to 0.84) | 40% | 39% / 5% | 42% | 37% |
+| kev-0.8b@w3 | 0.66 (0.61 to 0.70) | 12% | 1% / 0% | 0% | 2% |
+| laya | 0.85 (0.82 to 0.88) | 18% | 32% / 9% | 25% | 36% |
+| laya@w3 | 0.77 (0.73 to 0.80) | 18% | 17% / 5% | 11% | 22% |
+| gliner-labels_plain | 0.85 (0.82 to 0.88) | 38% | 7% / 0% | 5% | 8% |
+| protectai-deberta | 0.83 (0.79 to 0.86) | 33% | 3% / 0% | 3% | 2% |
+| promptguard2 | 0.81 (0.77 to 0.84) | 51% | 4% / 0% | 1% | 5% |
+| keywords | 0.50 (0.49 to 0.52) | 5% | 0% / 0% | 0% | 1% |
+
 ## Subtle attacks (never mention an AI)
 
 Added after the first look at test results: every standard attack above addresses "AI assistant" directly, which made them easy to spot. These 29 test attacks never do. Same benign chunks, same frozen thresholds.

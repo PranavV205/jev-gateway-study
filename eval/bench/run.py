@@ -1,6 +1,8 @@
 """Scores benchmark cases with one detector and appends raw results to results/raw/<name>.jsonl.
 
-Usage: venv/bin/python -m bench.run <detector> [--split dev|test|all] [--repeat N] [--limit N]
+Usage: venv/bin/python -m bench.run <detector> [--split dev|test|all] [--repeat N] [--limit N] [--data main|fresh]
+
+`--data fresh` scores the held-out set from bench.fresh and writes to results/raw/fresh/.
 
 Runs are resumable: a case already scored (same id and repeat index) is skipped, so an
 interrupted run continues where it stopped and nothing is paid for twice.
@@ -44,8 +46,11 @@ def make(name: str) -> d.Detector:
     raise SystemExit(f"unknown detector {name}")
 
 
-def load_cases(split: str) -> list[dict]:
-    cases = [json.loads(line) for line in (EVAL / "data" / "cases.jsonl").read_text().splitlines()]
+DATA_FILES = {"main": "cases.jsonl", "fresh": "fresh.jsonl"}
+
+
+def load_cases(split: str, data: str = "main") -> list[dict]:
+    cases = [json.loads(line) for line in (EVAL / "data" / DATA_FILES[data]).read_text().splitlines()]
     return cases if split == "all" else [c for c in cases if c["split"] == split]
 
 
@@ -66,13 +71,15 @@ async def main() -> None:
     ap.add_argument("--split", default="all", choices=["dev", "test", "all"])
     ap.add_argument("--repeat", type=int, default=1, help="score each case N times (determinism check)")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--data", default="main", choices=list(DATA_FILES))
     args = ap.parse_args()
 
     det = make(args.detector)
-    RAW.mkdir(parents=True, exist_ok=True)
-    out_path = RAW / f"{det.name}.jsonl"
+    out_dir = RAW / "fresh" if args.data == "fresh" else RAW
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{det.name}.jsonl"
     done = done_keys(out_path)
-    todo = [(c, k) for c in load_cases(args.split) for k in range(args.repeat) if (c["id"], k) not in done]
+    todo = [(c, k) for c in load_cases(args.split, args.data) for k in range(args.repeat) if (c["id"], k) not in done]
     if args.limit:
         todo = todo[: args.limit]
     print(f"{det.name}: {len(todo)} to score ({len(done)} already done)", file=sys.stderr)

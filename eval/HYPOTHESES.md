@@ -52,3 +52,25 @@ Checked 2026-09-26 against `results/report.md`. The predictions above are unchan
 | 11 | Yes | 9 of 87 innocent look-alike chunks scored above Jev's frozen threshold. |
 | 12 | No | Only ProtectAI (30 ms) was more than 5x faster than Jev (313 ms, network included). Laya and GLiNER were about 1.7x faster; Kev-4B was 3.5x slower. |
 | 13 | Partly | Over half evaded for Prompt Guard, ProtectAI, and GLiNER; not for Jev (4/10), Laya (2/10), or Kev-4B (1/10). |
+
+## Fresh held-out set (written 2026-09-26, before building or scoring it)
+
+Human-written attacks from Microsoft's LLMail-Inject challenge (Phase 2) that actually hijacked the email assistant, split by whether Microsoft's defenses caught them, against real Enron business emails. No tuning: every detector uses the chunk threshold already frozen on this repo's dev split.
+
+14. **Every detector's AUC is lower here than on this repo's in-document test set.** Human attacks are more varied than my templates, and Enron emails are full of human-to-human instructions.
+15. **Jev still ranks first, but its lead over Kev-4B shrinks to under 0.05 AUC.**
+16. **Prompt Guard 2 and ProtectAI do much better here than on the template set**, because many LLMail attacks use explicit "ignore instructions / send an email" phrasing that they were trained on.
+17. **Attacks that got past Microsoft's defenses are harder for every detector than the ones Microsoft caught.**
+18. **Jev's false alarms on Enron emails at its frozen threshold are above 10%.**
+
+### Outcomes for the fresh set
+
+Checked 2026-09-26 against `results/report.md`.
+
+| # | Held? | What happened |
+|---|-------|---------------|
+| 14 | No | Jev (1.00 to 1.00), Kev-4B (0.90 to 0.99), Laya, GLiNER, and ProtectAI all ranked as well or better on human attacks. Only Prompt Guard dipped slightly (0.83 to 0.81). |
+| 15 | Yes | Jev still first, and Kev-4B came within 0.01 AUC (0.99 vs 1.00). |
+| 16 | No | Prompt Guard and ProtectAI ranked a bit better (0.81 and 0.83 AUC) but caught 3 to 4% at their frozen thresholds. |
+| 17 | Mostly | Attacks that got past Microsoft were a little harder for most detectors (Jev 93% vs 96%, Kev-4B 82% vs 88%), but not for Kev-0.8B or ProtectAI. |
+| 18 | No | Jev flagged 0 of 400 Enron emails at its frozen threshold. |
