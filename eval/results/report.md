@@ -17,6 +17,20 @@ Attacks: `embedded_attack` + `grid_attack`. Benign: clean chunks, innocent look-
 | promptguard2 | 0.83 (0.78 to 0.88) | 16% | 20% | 24% / 7% | 1.00 | 19% (12% to 26%) | 2% (0% to 6%) | 0.38 | 27% | 29% |
 | keywords | 0.88 (0.83 to 0.92) | 65% | 65% | 65% / 0% | 0.33 | 65% (56% to 74%) | 0% (0% to 0%) | 0.12 | 5% | 26% |
 
+## Fairness pass: each model's best wording
+
+The frozen wording (w0) was tuned for Jev on earlier experiments. Here every question-based model picked one of four wordings on the dev split (rule fixed in advance: best mean of dev chunk and user AUC; ties keep w0), then the choice was scored once on test. Wordings are in `bench/detectors.py`.
+
+| Model | Wording | Chunk AUC | Chunk recall / FPR | Subtle AUC | Subtle recall | User AUC | User recall / FPR |
+|---|---|---|---|---|---|---|---|
+| jev | w0 (frozen, also chosen on dev) | 1.00 | 100% / 8% | 0.98 | 97% | 0.88 | 78% / 16% |
+| kev-4b | w0 (frozen) | 0.90 | 70% / 11% | 0.93 | 62% | 0.84 | 63% / 14% |
+| kev-4b | w3 (chosen on dev) | 0.89 | 45% / 0% | 0.94 | 34% | 0.87 | 70% / 16% |
+| kev-0.8b | w0 (frozen) | 0.70 | 10% / 5% | 0.50 | 3% | 0.79 | 55% / 13% |
+| kev-0.8b | w3 (chosen on dev) | 0.74 | 0% / 0% | 0.67 | 7% | 0.72 | 27% / 15% |
+| laya | w0 (frozen) | 0.82 | 21% / 1% | 0.78 | 21% | 0.60 | 20% / 15% |
+| laya | w3 (chosen on dev) | 0.91 | 19% / 1% | 0.85 | 17% | 0.56 | 18% / 7% |
+
 ## Subtle attacks (never mention an AI)
 
 Added after the first look at test results: every standard attack above addresses "AI assistant" directly, which made them easy to spot. These 29 test attacks never do. Same benign chunks, same frozen thresholds.

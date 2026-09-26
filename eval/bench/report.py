@@ -37,10 +37,10 @@ CHUNK_NEG = {"clean_chunk", "benign_lookalike", "length"}
 TUNED_FPR = 0.05
 
 
-def load():
+def load(detectors=DETECTORS):
     cases = {c["id"]: c for c in map(json.loads, (EVAL / "data" / "cases.jsonl").read_text().splitlines())}
     scores: dict[str, dict[str, list[dict]]] = {}
-    for det in DETECTORS:
+    for det in detectors:
         path = RESULTS / "raw" / f"{det}.jsonl"
         if not path.exists():
             continue
@@ -197,6 +197,51 @@ def adaptive_summary():
     return out
 
 
+def fairness_section(cases):
+    """Each question-based model's frozen-wording results next to its dev-chosen wording."""
+    path = RESULTS / "fairness.json"
+    if not path.exists():
+        return None, "Not run yet."
+    chosen = {m_: v["chosen"] for m_, v in json.loads(path.read_text()).items()}
+    names = []
+    for model, w in chosen.items():
+        names.append(model)
+        if w != "w0":
+            names.append(f"{model}@{w}")
+    _, fair_scores = load(names)
+    fair_scores = {n: s for n, s in fair_scores.items() if n in names}
+    chunk = headline(cases, fair_scores, "chunk", CHUNK_POS, CHUNK_NEG)
+    subtle = headline(cases, fair_scores, "chunk", {"subtle_attack"}, CHUNK_NEG)
+    user = headline(cases, fair_scores, "user", None, None)
+    rows = []
+    for model, w in chosen.items():
+        variants = (
+            [(model, "w0 (frozen, also chosen on dev)")]
+            if w == "w0"
+            else [(model, "w0 (frozen)"), (f"{model}@{w}", f"{w} (chosen on dev)")]
+        )
+        for n, label in variants:
+            if n not in chunk:
+                continue
+            rows.append(
+                [
+                    model,
+                    label,
+                    fmt(chunk[n]["auc"], False),
+                    f"{fmt(chunk[n]['tuned_recall'])} / {fmt(chunk[n]['tuned_fpr'])}",
+                    fmt(subtle[n]["auc"], False),
+                    fmt(subtle[n]["tuned_recall"]),
+                    fmt(user[n]["auc"], False),
+                    f"{fmt(user[n]['tuned_recall'])} / {fmt(user[n]['tuned_fpr'])}",
+                ]
+            )
+    md = table(
+        ["Model", "Wording", "Chunk AUC", "Chunk recall / FPR", "Subtle AUC", "Subtle recall", "User AUC", "User recall / FPR"],
+        rows,
+    )
+    return {"chosen": chosen, "chunk": chunk, "subtle": subtle, "user": user}, md
+
+
 def consistency(cases, scores, thresholds):
     out = {}
     for det, by_id in scores.items():
@@ -271,6 +316,7 @@ def main():
     benign_users = benign_breakdown(cases, scores, t_user, "user", {"notinject"}, "category")
     cons = consistency(cases, scores, t_chunk)
     obf_pairs = obfuscation_pairs(cases, scores, t_chunk)
+    fairness, fairness_md = fairness_section(cases)
     adaptive = adaptive_summary()
     speed = speed_cost(scores)
 
@@ -279,6 +325,7 @@ def main():
         "chunk_subtle": subtle,
         "obfuscation_pairs": obf_pairs,
         "adaptive": adaptive,
+        "fairness": fairness,
         "user": user,
         "user_deepset_vs_notinject": notinject_only,
         "breakdowns": {
@@ -338,6 +385,14 @@ def main():
         + (f"n = {first_det['n_pos']} attacks, {first_det['n_neg']} benign." if first_det else ""),
         "",
         headline_table(chunk),
+        "",
+        "## Fairness pass: each model's best wording",
+        "",
+        "The frozen wording (w0) was tuned for Jev on earlier experiments. Here every question-based model "
+        "picked one of four wordings on the dev split (rule fixed in advance: best mean of dev chunk and user "
+        "AUC; ties keep w0), then the choice was scored once on test. Wordings are in `bench/detectors.py`.",
+        "",
+        fairness_md,
         "",
         "## Subtle attacks (never mention an AI)",
         "",

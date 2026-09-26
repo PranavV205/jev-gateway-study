@@ -21,15 +21,18 @@ RAW = EVAL / "results" / "raw"
 
 
 def make(name: str) -> d.Detector:
+    """`name` may carry a wording from the fairness-pass menu, as in `kev-4b@w2`."""
     d.load_env()
+    name, _, wording = name.partition("@")
+    wording = wording or "w0"
     if name == "jev":
-        return d.jev()
+        return d.jev(wording)
     if name.startswith("kev-"):
         # One local Kev server per size: 0.8b on port 8009, 4b on 8011.
         size = name.removeprefix("kev-")
-        return d.kev(size, {"0.8b": 8009, "4b": 8011}[size])
+        return d.kev(size, {"0.8b": 8009, "4b": 8011}[size], wording)
     if name == "laya":
-        return d.Laya()
+        return d.Laya(wording)
     if name.startswith("gliner-"):
         return d.Gliner(name.removeprefix("gliner-"))
     if name == "protectai-deberta":
