@@ -108,16 +108,16 @@ Only 51 of the 220 attacks mention an AI at all; most are disguised as ordinary 
 
 The home-field advantage does not explain Jev's lead. The open models all preferred the plainer "name the attack" wording, which lifted Laya's ranking on chunks the most (0.82 to 0.91). Kev-4B came within 0.01 of Jev on user messages. At a threshold frozen for 5% dev false alarms, their recall stayed well below Jev's, because their scores for attacks and innocent text overlap more.
 
-**Adaptive attacks.** An LLM attacker (gpt-oss-120b) rewrote 10 attacks each detector had caught, seeing the detector's score, up to 5 tries. A rewrite counted only if it kept the canary code and a judge call confirmed it still tried to make an AI do the same thing.
+**Adaptive attacks.** The same 36 test attacks (6 per goal, 12 of them subtle) for every detector. An LLM attacker (gpt-oss-120b) rewrote each attack the detector caught, seeing the detector's score, up to 5 tries. A rewrite counted only if it kept the canary code and a judge call confirmed it still tried to make an AI do the same thing. An attack gets through if the detector missed it from the start or a rewrite got past.
 
-| Detector | Evaded |
-|---|---|
-| Prompt Guard 2 | 9/10 |
-| ProtectAI DeBERTa | 8/9 |
-| GLiNER2.5-Decide | 8/10 |
-| Jev | 4/10 |
-| Laya | 2/10 |
-| Kev-4B | 1/10 |
+| Detector | Got through | Missed from the start | Rewritten past | Held |
+|---|---|---|---|---|
+| Jev | 12/36 | 0 | 12 | 24 |
+| Kev-4B | 22/36 | 14 | 8 | 14 |
+| Laya | 31/36 | 27 | 4 | 5 |
+| GLiNER2.5-Decide | 33/36 | 31 | 2 | 3 |
+| Prompt Guard 2 | 36/36 | 32 | 4 | 0 |
+| ProtectAI DeBERTa | 36/36 | 33 | 3 | 0 |
 
 **Speed and cost** on this machine: Jev 313 ms p50 (network included) and $0.023 per 1,000 texts. Kev-4B 1.1 s, Laya 171 ms, GLiNER 186 ms, Kev-0.8B 158 ms, ProtectAI 30 ms, all $0. Prompt Guard's 2.1 s is the pacing used for Groq's rate limit, not the model.
 
@@ -133,14 +133,14 @@ The home-field advantage does not explain Jev's lead. The open models all prefer
 8. **Jev is not deterministic.** The same text sent three times changed score on 33 of 50 texts, by up to 0.07.
 9. **The dedicated injection classifiers rank human attacks decently, but their default thresholds catch almost nothing.** Prompt Guard and ProtectAI reached 0.81 to 0.83 AUC on LLMail-Inject but flagged 3 to 4% at their frozen thresholds. On the template set they were tuned to jailbreak phrasing: Prompt Guard caught 23/23 "ignore your instructions" attacks and 0 of every other goal.
 10. **Laya's scores are poorly separated on user messages** (0.60 AUC, with 61% false alarms at its native 0.5), and it drops off on long input (0 of 6 at 1,200 and 2,400 words), consistent with its 512-token window.
-11. **Adaptive attacks beat every detector sometimes**, and the injection classifiers almost always, usually within 2 rewrites.
+11. **An attacker who can see the score gets past Jev a third of the time.** Jev caught all 36 shared attacks at the start, but 12 were rewritten past it (median 3 tries). Kev-4B let 22 through, mostly by missing them outright; once each had caught an attack, rewrites beat both at a similar rate. Prompt Guard and ProtectAI let all 36 through, almost all missed before any rewriting.
 
 ## Caveats
 
 - The main set is one domain (fictional business documents) with template attacks. The fresh set fixes authorship but has its own limits: every LLMail attack pursues the same goal (send "confirmation" to one address), and the Enron emails are from around 2000 while the attacks are from 2025, so some separation may come from writing style rather than intent. Keywords scored 0.50 there, so it is not simple surface words.
 - A threshold tuned on one data set does not always transfer: the same model can rank a new set almost perfectly while its fixed threshold catches far fewer attacks (Kev-4B's chosen wording: 1.00 AUC, 42% caught).
-- Small groups: 29 subtle attacks, 6 to 12 per obfuscation, 10 attacks per detector in the adaptive round. Intervals are wide there.
-- Adaptive starting sets differ by detector: each starts from attacks it already caught, which for weak detectors are the most obvious ones.
+- Small groups: 29 subtle attacks, 6 to 12 per obfuscation, 36 attacks in the adaptive round. Intervals are wide there.
+- The adaptive attacker sees the exact score after every try, which a real attacker usually does not. Five tries is a small budget; more tries would get more through.
 - deepset labels are broad: some "injections" are ordinary task requests.
 - Jev's original wording was tuned on dev cases from this repo. The fairness pass gave the open models a choice of wordings, but none was fine-tuned for this task. Kev ships a training recipe, so a fine-tuned Kev could do better.
 - The adaptive round, consistency checks, and breakdowns use each model's original wording.
@@ -163,7 +163,7 @@ venv/bin/python -m bench.run jev              # or kev-4b, kev-0.8b, laya, gline
                                               #    protectai-deberta, promptguard2, keywords
 venv/bin/python -m bench.run kev-4b@w3 --split dev   # a fairness-pass wording (w1 to w3)
 venv/bin/python -m bench.fairness             # pick each model's wording on dev
-venv/bin/python -m bench.adaptive jev         # adaptive attack round
+venv/bin/python -m bench.adaptive jev --shared 36   # adaptive attack round
 venv/bin/python -m bench.e2e openai/gpt-oss-120b defended   # end-to-end attack success
 venv/bin/python -m bench.report               # results/report.md and results/summary.json
 ```

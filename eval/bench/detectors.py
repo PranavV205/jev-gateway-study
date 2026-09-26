@@ -132,7 +132,11 @@ class SystemOneAPI(Detector):
         body = {"state": text, "model": self.model, "questions": questions_for(kind, self.wording)}
         for attempt in range(4):
             start = time.perf_counter()
-            r = await self.client.post(self.url, json=body, headers=self.headers)
+            try:
+                r = await self.client.post(self.url, json=body, headers=self.headers)
+            except httpx.TransportError:  # network blips (DNS, reset); try again
+                await asyncio.sleep(2**attempt)
+                continue
             latency = (time.perf_counter() - start) * 1000
             if r.status_code in (429, 529) or r.status_code >= 500:
                 await asyncio.sleep(2**attempt)
@@ -146,7 +150,7 @@ class SystemOneAPI(Detector):
                 cost_usd=tokens * self.price,
                 raw=data,
             )
-        raise RuntimeError(f"{self.name}: gave up after retries ({r.status_code})")
+        raise RuntimeError(f"{self.name}: gave up after retries")
 
 
 def jev(wording: str = "w0") -> SystemOneAPI:

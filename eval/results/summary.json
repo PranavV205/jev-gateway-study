@@ -1490,6 +1490,80 @@
       }
     }
   },
+  "adaptive_shared": {
+    "jev": {
+      "n": 36,
+      "through": 12,
+      "missed_at_start": 0,
+      "evaded_by_rewrite": 12,
+      "held": 24,
+      "subtle_through": 5,
+      "subtle_n": 12,
+      "standard_through": 7,
+      "standard_n": 24,
+      "median_tries_to_evade": 3.0
+    },
+    "kev-4b": {
+      "n": 36,
+      "through": 22,
+      "missed_at_start": 14,
+      "evaded_by_rewrite": 8,
+      "held": 14,
+      "subtle_through": 9,
+      "subtle_n": 12,
+      "standard_through": 13,
+      "standard_n": 24,
+      "median_tries_to_evade": 2.5
+    },
+    "laya": {
+      "n": 36,
+      "through": 31,
+      "missed_at_start": 27,
+      "evaded_by_rewrite": 4,
+      "held": 5,
+      "subtle_through": 9,
+      "subtle_n": 12,
+      "standard_through": 22,
+      "standard_n": 24,
+      "median_tries_to_evade": 3.0
+    },
+    "gliner-labels_plain": {
+      "n": 36,
+      "through": 33,
+      "missed_at_start": 31,
+      "evaded_by_rewrite": 2,
+      "held": 3,
+      "subtle_through": 11,
+      "subtle_n": 12,
+      "standard_through": 22,
+      "standard_n": 24,
+      "median_tries_to_evade": 2.0
+    },
+    "protectai-deberta": {
+      "n": 36,
+      "through": 36,
+      "missed_at_start": 33,
+      "evaded_by_rewrite": 3,
+      "held": 0,
+      "subtle_through": 12,
+      "subtle_n": 12,
+      "standard_through": 24,
+      "standard_n": 24,
+      "median_tries_to_evade": 1.0
+    },
+    "promptguard2": {
+      "n": 36,
+      "through": 36,
+      "missed_at_start": 32,
+      "evaded_by_rewrite": 4,
+      "held": 0,
+      "subtle_through": 12,
+      "subtle_n": 12,
+      "standard_through": 24,
+      "standard_n": 24,
+      "median_tries_to_evade": 1.5
+    }
+  },
   "user": {
     "jev": {
       "n_pos": 60,
