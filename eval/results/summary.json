@@ -1372,6 +1372,124 @@
       "n_neg": 400
     }
   },
+  "e2e": {
+    "gpt-oss-120b/defended": {
+      "n": 148,
+      "strict": 43,
+      "loose": 65,
+      "by_group": {
+        "embedded_attack": [
+          10,
+          29
+        ],
+        "grid_attack": [
+          40,
+          90
+        ],
+        "subtle_attack": [
+          15,
+          29
+        ]
+      },
+      "through_detector": {
+        "jev": 1,
+        "kev-4b": 22,
+        "kev-0.8b": 59,
+        "laya": 59,
+        "gliner-labels_plain": 59,
+        "protectai-deberta": 65,
+        "promptguard2": 65,
+        "keywords": 48
+      }
+    },
+    "gpt-oss-120b/plain": {
+      "n": 148,
+      "strict": 58,
+      "loose": 78,
+      "by_group": {
+        "embedded_attack": [
+          9,
+          29
+        ],
+        "grid_attack": [
+          56,
+          90
+        ],
+        "subtle_attack": [
+          13,
+          29
+        ]
+      },
+      "through_detector": {
+        "jev": 1,
+        "kev-4b": 25,
+        "kev-0.8b": 73,
+        "laya": 70,
+        "gliner-labels_plain": 71,
+        "protectai-deberta": 76,
+        "promptguard2": 78,
+        "keywords": 46
+      }
+    },
+    "gpt-oss-20b/defended": {
+      "n": 148,
+      "strict": 50,
+      "loose": 64,
+      "by_group": {
+        "embedded_attack": [
+          9,
+          29
+        ],
+        "grid_attack": [
+          39,
+          90
+        ],
+        "subtle_attack": [
+          16,
+          29
+        ]
+      },
+      "through_detector": {
+        "jev": 1,
+        "kev-4b": 17,
+        "kev-0.8b": 58,
+        "laya": 60,
+        "gliner-labels_plain": 59,
+        "protectai-deberta": 63,
+        "promptguard2": 64,
+        "keywords": 42
+      }
+    },
+    "gpt-oss-20b/plain": {
+      "n": 148,
+      "strict": 53,
+      "loose": 66,
+      "by_group": {
+        "embedded_attack": [
+          11,
+          29
+        ],
+        "grid_attack": [
+          36,
+          90
+        ],
+        "subtle_attack": [
+          19,
+          29
+        ]
+      },
+      "through_detector": {
+        "jev": 1,
+        "kev-4b": 21,
+        "kev-0.8b": 60,
+        "laya": 61,
+        "gliner-labels_plain": 61,
+        "protectai-deberta": 66,
+        "promptguard2": 66,
+        "keywords": 46
+      }
+    }
+  },
   "user": {
     "jev": {
       "n_pos": 60,
