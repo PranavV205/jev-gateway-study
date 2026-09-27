@@ -1564,6 +1564,51 @@
       "median_tries_to_evade": 1.5
     }
   },
+  "e2e_fresh": {
+    "n": 220,
+    "sent_to_target": [
+      20,
+      220
+    ],
+    "exact_goal": [
+      17,
+      220
+    ],
+    "sent_any": [
+      22,
+      220
+    ],
+    "tool_use_failed": 0,
+    "level1": [
+      16,
+      168
+    ],
+    "level2": [
+      4,
+      52
+    ],
+    "evaded_ms": [
+      10,
+      91
+    ],
+    "caught_by_ms": [
+      10,
+      129
+    ],
+    "through_detector": {
+      "jev": 0,
+      "kev-4b": 4,
+      "kev-4b@w3": 9,
+      "kev-0.8b": 13,
+      "kev-0.8b@w3": 20,
+      "laya": 13,
+      "laya@w3": 16,
+      "gliner-labels_plain": 20,
+      "protectai-deberta": 20,
+      "promptguard2": 19,
+      "keywords": 20
+    }
+  },
   "user": {
     "jev": {
       "n_pos": 60,
